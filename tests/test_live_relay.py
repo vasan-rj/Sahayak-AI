@@ -5,6 +5,9 @@ network. This is the closest deterministic proxy for the real Live session.
 
 import asyncio
 
+import pytest
+from google.genai import errors as genai_errors
+
 from app.form_state import FormState
 from app.live_session import LiveRelay
 from app.witness_log import WitnessLog
@@ -13,6 +16,51 @@ from tests.mocks import MockLiveSession, audio_msg, caption_msg, tool_msg
 
 def _run(coro):
     return asyncio.run(coro)
+
+
+class _RaisingSession(MockLiveSession):
+    """A mock whose receive() raises `exc` after draining any scripted turns."""
+
+    def __init__(self, exc, turns=None):
+        super().__init__(turns or [])
+        self._exc = exc
+
+    async def receive(self):
+        if self._turns:
+            for m in self._turns.pop(0):
+                yield m
+            return
+        raise self._exc
+
+
+def test_remote_1008_close_ends_loop_without_raising(caplog):
+    """1008 'operation was aborted' (teardown) must not crash the receive loop."""
+    mock = _RaisingSession(genai_errors.APIError(1008, {}))
+    relay = LiveRelay(mock)
+
+    _run(relay.receive_loop())  # must return, not raise
+
+    assert relay._close_code == 1008
+    assert any("1008" in r.message for r in caplog.records)  # breadcrumb, no traceback
+
+
+def test_clean_1000_close_ends_loop_quietly(caplog):
+    mock = _RaisingSession(genai_errors.APIError(1000, {}))
+    relay = LiveRelay(mock)
+
+    _run(relay.receive_loop())
+
+    assert relay._close_code == 1000
+    assert not any(r.levelname == "WARNING" for r in caplog.records)
+
+
+def test_real_bug_still_propagates():
+    """A non-closure exception mid-session is a real bug and must not be swallowed."""
+    mock = _RaisingSession(RuntimeError("boom in _handle"))
+    relay = LiveRelay(mock)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        _run(relay.receive_loop())
 
 
 def test_scripted_stream_fills_form_and_logs(tmp_path):

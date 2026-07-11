@@ -23,12 +23,39 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from typing import Any, Awaitable, Callable, Optional
 
+from google.genai import errors as genai_errors
 from google.genai import types
+
+log = logging.getLogger("sahayak")
 
 AUDIO_IN_MIME = "audio/pcm;rate=16000"  # Live API expects 16 kHz PCM16 mic input
 FRAME_MIME = "image/jpeg"
+
+# WebSocket close codes we consider a clean end of session (no warning worth logging).
+_CLEAN_CLOSE_CODES = (None, 1000, 1001)
+
+
+def _closure_code(exc: BaseException) -> Optional[int]:
+    """WebSocket close code if *exc* is the Live socket closing, else ``None``.
+
+    ``receive_loop`` exists only to drain the Gemini socket, so ANY remote close is
+    the loop's natural end, not a fault — regardless of the code. google-genai
+    surfaces a close as an ``APIError`` whose ``.code`` is the raw WS close code
+    (1000 = OK, 1001 = going away, 1008 = "operation was aborted" on teardown, ...),
+    or the underlying ``websockets`` layer raises a ``ConnectionClosed*``. Returning
+    the code (vs a bool) lets the caller distinguish clean from noisy-but-still-benign
+    for log level. Returns ``None`` when *exc* is not a socket close at all — that is
+    a real bug in the loop and must propagate.
+    """
+    if isinstance(exc, genai_errors.APIError):
+        return getattr(exc, "code", None)
+    # Match by class name so we don't hard-depend on the websockets package layout.
+    if type(exc).__name__ in ("ConnectionClosedOK", "ConnectionClosedError", "ConnectionClosed"):
+        return getattr(exc, "code", None) or 1000
+    return None
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -55,6 +82,7 @@ class LiveRelay:
         self._on_complete = on_complete
         self._on_interrupted = on_interrupted
         self._closed = False
+        self._close_code: Optional[int] = None  # last WS close code, for diagnostics
 
     # --- browser -> Gemini ----------------------------------------------------
     async def send_audio(self, pcm: bytes) -> None:
@@ -67,15 +95,34 @@ class LiveRelay:
             video=types.Blob(data=jpeg, mime_type=FRAME_MIME)
         )
 
+    async def send_text(self, text: str, *, end_of_turn: bool = True) -> None:
+        """Send a text turn. Used to kick off the session so the agent greets and
+        leads FIRST — the Live model stays silent until it receives some input."""
+        await self._session.send_client_content(
+            turns=types.Content(role="user", parts=[types.Part(text=text)]),
+            turn_complete=end_of_turn,
+        )
+
     # --- Gemini -> proxy ------------------------------------------------------
     async def receive_loop(self) -> None:
-        while not self._closed:
-            saw_message = False
-            async for msg in self._session.receive():
-                saw_message = True
-                await self._handle(msg)
-            if not saw_message:
-                break  # receive() yielded nothing -> the session ended
+        try:
+            while not self._closed:
+                saw_message = False
+                async for msg in self._session.receive():
+                    saw_message = True
+                    await self._handle(msg)
+                if not saw_message:
+                    break  # receive() yielded nothing -> the session ended
+        except Exception as exc:  # noqa: BLE001 - a socket close is not a loop fault
+            code = _closure_code(exc)
+            if code is None and not self._closed:
+                raise  # not a socket close and we aren't tearing down -> real bug
+            self._close_code = code
+            if code not in _CLEAN_CLOSE_CODES and not self._closed:
+                # e.g. 1008 "operation was aborted" — benign on teardown, but if it
+                # arrives mid-session it's worth a breadcrumb (no traceback, no crash).
+                log.warning("Live session closed by remote with code %s", code)
+            return  # loop's job is done: the socket is gone
 
     async def _handle(self, msg: Any) -> None:
         sc = getattr(msg, "server_content", None)

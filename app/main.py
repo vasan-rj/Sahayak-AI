@@ -42,6 +42,10 @@ load_dotenv()
 MEDIA_AUDIO = 0x01  # 16 kHz PCM16 mic chunk
 MEDIA_VIDEO = 0x02  # JPEG camera frame
 
+# The Live model stays silent until it gets input, so kick the session on connect:
+# the agent greets and asks for the first field before the user says anything.
+OPENING_TRIGGER = "Begin now. Greet the user in their language and ask for the first field."
+
 app = FastAPI(title="Sahayak Proxy", version="0.2.0")
 app.include_router(admin_router)
 registry = SessionRegistry()
@@ -204,6 +208,7 @@ async def ws_endpoint(websocket: WebSocket) -> None:
             session.relay = relay
             recv_task = asyncio.create_task(relay.receive_loop())
             _guard(recv_task)
+            await relay.send_text(OPENING_TRIGGER)  # make the agent greet first
             await _pump_browser_to_relay(session, relay)
     except WebSocketDisconnect:
         pass

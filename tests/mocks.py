@@ -37,7 +37,11 @@ class MockLiveSession:
         self.audio_sent: list[bytes] = []
         self.video_sent: list[bytes] = []
         self.tool_responses: list = []
+        self.client_content: list = []
         self.closed = False
+
+    async def send_client_content(self, *, turns=None, turn_complete=True):
+        self.client_content.append((turns, turn_complete))
 
     async def send_realtime_input(self, *, audio=None, video=None, **kw):
         if audio is not None:

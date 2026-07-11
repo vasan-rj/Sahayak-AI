@@ -23,9 +23,14 @@ SCRIPTED_TURN = [
 ]
 
 
+_LAST_MOCK: dict = {}
+
+
 @contextlib.asynccontextmanager
 async def _fake_relay_cm(session, callbacks):
-    yield LiveRelay(MockLiveSession([list(SCRIPTED_TURN)]), **callbacks)
+    mock = MockLiveSession([list(SCRIPTED_TURN)])
+    _LAST_MOCK["m"] = mock
+    yield LiveRelay(mock, **callbacks)
 
 
 def _use_mock_relay(monkeypatch):
@@ -87,6 +92,20 @@ def test_ws_scripted_session_fills_form(monkeypatch):
     assert "form_complete" in kinds
     assert kinds[-1] == "session_end"
     assert log.verify() is True
+
+
+def test_ws_sends_opening_trigger(monkeypatch):
+    """Regression: the agent must greet first. The proxy sends an opening text
+    turn on connect, otherwise the Live model stays silent (no audio)."""
+    _use_mock_relay(monkeypatch)
+    with TestClient(main.app) as c:
+        with c.websocket_connect("/ws") as ws:
+            for _ in range(40):
+                if ws.receive_json()["type"] == "form_complete":
+                    break
+    mock = _LAST_MOCK["m"]
+    assert mock.client_content, "no opening turn was sent — agent would be silent"
+    assert "Begin now" in str(mock.client_content[0][0])
 
 
 def test_caption_event_shape(monkeypatch):
