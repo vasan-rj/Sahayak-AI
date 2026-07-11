@@ -9,3 +9,4 @@ import os
 import tempfile
 
 os.environ.setdefault("SAHAYAK_LOG_DIR", tempfile.mkdtemp(prefix="sahayak-test-"))
+os.environ.setdefault("SAHAYAK_TEMPLATE_DIR", tempfile.mkdtemp(prefix="sahayak-tmpl-"))

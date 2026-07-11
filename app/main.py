@@ -14,8 +14,9 @@ import contextlib
 import logging
 import os
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
+from .admin import router as admin_router
 from .env import load_dotenv
 from .live_session import LiveRelay
 from .markers import parse_and_strip
@@ -28,7 +29,8 @@ from .protocol import (
     form_snapshot_event,
 )
 from .session import Session, SessionRegistry
-from .session_config import FIELD_SOURCE, LIVE_MODEL, TEMPLATE, live_config
+from .session_config import LIVE_MODEL, field_source, live_config
+from .template_store import get_store
 
 log = logging.getLogger("sahayak")
 
@@ -41,7 +43,9 @@ MEDIA_AUDIO = 0x01  # 16 kHz PCM16 mic chunk
 MEDIA_VIDEO = 0x02  # JPEG camera frame
 
 app = FastAPI(title="Sahayak Proxy", version="0.2.0")
+app.include_router(admin_router)
 registry = SessionRegistry()
+store = get_store()
 
 
 @app.get("/health")
@@ -50,9 +54,26 @@ async def health() -> dict:
 
 
 @app.get("/template")
-async def template() -> dict:
-    """The blank form the UI renders and fills as fields are confirmed."""
-    return TEMPLATE
+async def template(id: str | None = None) -> dict:
+    """The blank form the UI renders and fills. Defaults to the active template;
+    ``?id=<template_id>`` fetches a specific one."""
+    if id:
+        try:
+            return store.get(id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="unknown template")
+    return store.get_active()
+
+
+def _select_template(websocket: WebSocket) -> dict:
+    """Applicant fills the active template, or ``/ws?template=<id>`` for a specific one."""
+    tid = websocket.query_params.get("template")
+    if tid:
+        try:
+            return store.get(tid)
+        except KeyError:
+            pass
+    return store.get_active()
 
 
 def _make_client():
@@ -74,7 +95,8 @@ async def _default_relay_cm(session: Session, callbacks: dict):
     client = _make_client()
     if client is None:
         raise RuntimeError("GOOGLE_API_KEY not set")
-    async with client.aio.live.connect(model=LIVE_MODEL, config=live_config()) as gsession:
+    config = live_config(session.form.template)  # per-template instruction + tools
+    async with client.aio.live.connect(model=LIVE_MODEL, config=config) as gsession:
         yield LiveRelay(gsession, **callbacks)
 
 
@@ -117,12 +139,14 @@ def _make_callbacks(session: Session) -> dict:
         session.outbound.put_nowait(form_complete_event())
         session.outbound.put_nowait(form_snapshot_event(session.form.snapshot()))
 
+    src_map = field_source(session.form.template)
+
     def on_caption(side: str, text: str, lang: str | None) -> None:
         # Primary capture is the tool path; here we also scrub any stray markers
         # out of the caption and honor them as a fallback.
         fields, complete, clean = parse_and_strip(text)
         for fid, val in fields:
-            on_field(fid, val, FIELD_SOURCE.get(fid, "voice"))
+            on_field(fid, val, src_map.get(fid, "voice"))
         if complete:
             on_complete()
         if clean:
@@ -166,7 +190,7 @@ async def _pump_browser_to_relay(session: Session, relay: LiveRelay) -> None:
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
-    session = registry.create()
+    session = registry.create(template=_select_template(websocket))
     session.ws = websocket
     session.log.append("session_start", {"session_id": session.id})
     session.outbound.put_nowait(form_snapshot_event(session.form.snapshot()))

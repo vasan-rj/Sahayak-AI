@@ -54,14 +54,14 @@ class SessionRegistry:
         os.makedirs(self.log_dir, exist_ok=True)
         self._sessions: dict[str, Session] = {}
 
-    def create(self) -> Session:
+    def create(self, template: dict | None = None) -> Session:
         sid = uuid.uuid4().hex
         log = WitnessLog(os.path.join(self.log_dir, f"{sid}.jsonl"))
         session = Session(
             id=sid,
             log=log,
             outbound=asyncio.Queue(maxsize=OUTBOUND_MAXSIZE),
-            form=FormState(),
+            form=FormState(template),
         )
         self._sessions[sid] = session
         return session

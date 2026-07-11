@@ -1,0 +1,232 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --ink: #1f2733;
+  --muted: #6b7684;
+  --line: #e2e6ec;
+  --accent: #2f6df6;
+  --danger: #d2453d;
+  --ok: #1c8a44;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.admin {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+}
+
+.admin-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.75rem;
+}
+.admin-top h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+.admin-top nav button {
+  border: 1px solid var(--line);
+  background: var(--card);
+  padding: 0.4rem 0.9rem;
+  border-radius: 8px;
+  margin-left: 0.4rem;
+  cursor: pointer;
+}
+.admin-top nav button.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.admin-msg {
+  margin: 0.75rem 0;
+  padding: 0.55rem 0.85rem;
+  background: #eef3ff;
+  border: 1px solid #cfe0ff;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.col {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  min-height: 60vh;
+}
+.col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.col-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 7px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+button.danger {
+  color: var(--danger);
+  border-color: #f0c9c6;
+}
+
+.upload {
+  display: block;
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+  padding: 0.8rem;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+  margin-bottom: 0.85rem;
+}
+.upload input {
+  display: block;
+  margin: 0.4rem auto 0;
+}
+
+.tlist,
+.slist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.tlist li,
+.slist li {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.tlist li.active {
+  border-color: var(--ok);
+  background: #eefaf1;
+}
+.tinfo,
+.slist li {
+  display: flex;
+  flex-direction: column;
+}
+.slist li {
+  cursor: pointer;
+}
+.tinfo span,
+.slist li span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.tactions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.editor label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+}
+.editor input,
+.editor select {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
+}
+.frow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)) auto;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+.frow input,
+.frow select {
+  margin-top: 0;
+}
+.frow button {
+  padding: 0.3rem 0.5rem;
+}
+.editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.detail .verify {
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+.verify.ok {
+  color: var(--ok);
+  background: #eefaf1;
+}
+.verify.bad {
+  color: var(--danger);
+  background: #fdeceb;
+}
+.entries {
+  margin: 0.75rem 0 0;
+  padding-left: 1rem;
+}
+.entries li {
+  margin-bottom: 0.3rem;
+  font-size: 0.9rem;
+}
+.entries code {
+  background: #eef1f5;
+  padding: 0.1rem 0.4rem;
+  border-radius: 5px;
+  margin-right: 0.4rem;
+}
+.ph {
+  color: var(--muted);
+}

@@ -47,22 +47,32 @@ TEMPLATE = {
     ],
 }
 
-FIELD_IDS = [f["id"] for f in TEMPLATE["fields"]]
-
-# Source inferred from a field's type — used by the marker fallback path, which
-# (unlike the record_field tool) carries no explicit source.
-FIELD_SOURCE = {
-    f["id"]: ("document" if f["type"] == "document" else "voice")
-    for f in TEMPLATE["fields"]
-}
+# --- Per-template builders ----------------------------------------------------
+# The admin dashboard makes the app multi-form: the system instruction and the
+# record_field tool's field-id enum are built FROM the active template, not baked
+# into a constant. The functions below take a template; the module-level values
+# further down are the defaults built from TEMPLATE (the seed / demo form).
 
 
-def _fields_for_prompt() -> str:
+def field_ids(template: dict) -> list[str]:
+    return [f["id"] for f in template["fields"]]
+
+
+def field_source(template: dict) -> dict:
+    """field_id -> "document"|"voice", inferred from type. Used by the marker
+    fallback path, which (unlike record_field) carries no explicit source."""
+    return {
+        f["id"]: ("document" if f["type"] == "document" else "voice")
+        for f in template["fields"]
+    }
+
+
+def _fields_for_prompt(template: dict) -> str:
     lines = []
-    for f in TEMPLATE["fields"]:
+    for f in template["fields"]:
         if f["type"] == "document":
             lines.append(
-                f'- {f["id"]} ("{f["label"]}"): DOCUMENT from {f["source_doc"]} — '
+                f'- {f["id"]} ("{f["label"]}"): DOCUMENT from {f.get("source_doc", "a document")} — '
                 f'extract {f["extract"]}. Ask: "{f["ask"]}"'
             )
         else:
@@ -72,7 +82,8 @@ def _fields_for_prompt() -> str:
     return "\n".join(lines)
 
 
-SYSTEM_INSTRUCTION = f"""\
+def build_system_instruction(template: dict) -> str:
+    return f"""\
 You are Sahayak, a voice-first form-filling companion for people who may not read
 or write. You help them complete an official form by talking to them and by looking
 at their documents through a live camera. You are patient, warm, and speak in short,
@@ -82,8 +93,8 @@ LANGUAGE: Speak the user's language. Default Hindi. If the user speaks Tamil, sw
 to Tamil instantly and continue — never announce the switch, just follow. Never
 require the user to read or write anything, and never ask them to spell anything.
 
-THE FORM — fill these fields in order:
-{_fields_for_prompt()}
+THE FORM ({template["title"]}) — fill these fields in order:
+{_fields_for_prompt(template)}
 
 FOR EACH FIELD:
 - If it is a DOCUMENT field: ask the user to show the named document to the camera
@@ -110,34 +121,47 @@ NEVER invent a value you cannot see or did not hear. NEVER ask the user to read 
 form. Keep spoken turns short.
 """
 
-# --- Structured-capture tools (primary path) ---------------------------------
-RECORD_FIELD_TOOL = {
-    "name": "record_field",
-    "description": "Record a form field value AFTER the user has confirmed it out loud.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "field_id": {
-                "type": "string",
-                "enum": FIELD_IDS,
-                "description": "Which form field this value fills.",
+
+def build_record_field_tool(template: dict) -> dict:
+    return {
+        "name": "record_field",
+        "description": "Record a form field value AFTER the user has confirmed it out loud.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "field_id": {
+                    "type": "string",
+                    "enum": field_ids(template),
+                    "description": "Which form field this value fills.",
+                },
+                "value": {"type": "string", "description": "The exact confirmed value."},
+                "source": {
+                    "type": "string",
+                    "enum": ["document", "voice"],
+                    "description": "Where the value came from: a document read by camera, or the user's speech.",
+                },
             },
-            "value": {"type": "string", "description": "The exact confirmed value."},
-            "source": {
-                "type": "string",
-                "enum": ["document", "voice"],
-                "description": "Where the value came from: a document read by camera, or the user's speech.",
-            },
+            "required": ["field_id", "value", "source"],
         },
-        "required": ["field_id", "value", "source"],
-    },
-}
+    }
+
 
 FORM_COMPLETE_TOOL = {
     "name": "form_complete",
     "description": "Signal that every field has been captured and confirmed.",
     "parameters": {"type": "object", "properties": {}},
 }
+
+
+def build_tools(template: dict) -> list:
+    return [{"function_declarations": [build_record_field_tool(template), FORM_COMPLETE_TOOL]}]
+
+
+# --- Module-level defaults (built from the seed template, for back-compat) ----
+FIELD_IDS = field_ids(TEMPLATE)
+FIELD_SOURCE = field_source(TEMPLATE)
+SYSTEM_INSTRUCTION = build_system_instruction(TEMPLATE)
+RECORD_FIELD_TOOL = build_record_field_tool(TEMPLATE)
 
 # --- Live model (env-overridable) ---------------------------------------------
 # gemini-3.1-flash-live-preview verified working (connect + tools + transcription
@@ -146,17 +170,29 @@ FORM_COMPLETE_TOOL = {
 LIVE_MODEL = os.environ.get("SAHAYAK_LIVE_MODEL", "gemini-3.1-flash-live-preview")
 
 
-def live_config(system_instruction: str | None = None) -> dict:
-    """Build the LiveConnectConfig dict for google-genai (2.x).
+def live_config(template: dict | None = None) -> dict:
+    """Build the LiveConnectConfig dict for google-genai (2.x) for a template.
 
     Returned as a plain dict so this module needs no google-genai import (keeps
     pure-logic tests import-light). ``app/live_session.py`` passes it to
-    ``client.aio.live.connect(config=...)``.
+    ``client.aio.live.connect(config=...)``. Defaults to the seed TEMPLATE.
     """
+    template = template or TEMPLATE
     return {
         "response_modalities": ["AUDIO"],
-        "system_instruction": system_instruction or SYSTEM_INSTRUCTION,
+        "system_instruction": build_system_instruction(template),
         "input_audio_transcription": {},  # enable user-speech transcription (captions)
         "output_audio_transcription": {},  # enable agent-speech transcription (captions)
-        "tools": [{"function_declarations": [RECORD_FIELD_TOOL, FORM_COMPLETE_TOOL]}],
+        "tools": build_tools(template),
+        # Reactive turn-taking: automatic VAD stays on (so the user can barge in and
+        # the model pauses itself), with high sensitivity and a short trailing
+        # silence so the agent answers quickly once the user stops talking.
+        "realtime_input_config": {
+            "automatic_activity_detection": {
+                "start_of_speech_sensitivity": "START_SENSITIVITY_HIGH",
+                "end_of_speech_sensitivity": "END_SENSITIVITY_HIGH",
+                "prefix_padding_ms": 200,
+                "silence_duration_ms": 450,
+            },
+        },
     }
