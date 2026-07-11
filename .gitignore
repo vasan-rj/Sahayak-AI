@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Witness logs (runtime, per-session; never committed)
+data/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+
+# Env / secrets
+.env
+*.local
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
