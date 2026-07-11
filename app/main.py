@@ -16,6 +16,7 @@ import os
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from .env import load_dotenv
 from .live_session import LiveRelay
 from .markers import parse_and_strip
 from .protocol import (
@@ -30,6 +31,10 @@ from .session import Session, SessionRegistry
 from .session_config import FIELD_SOURCE, LIVE_MODEL, TEMPLATE, live_config
 
 log = logging.getLogger("sahayak")
+
+# Load .env at import so `uvicorn app.main:app` has GOOGLE_API_KEY without the
+# caller exporting it first. An exported shell var still wins (setdefault).
+load_dotenv()
 
 # Inbound binary media tags (first byte of each binary WS frame from the browser).
 MEDIA_AUDIO = 0x01  # 16 kHz PCM16 mic chunk
