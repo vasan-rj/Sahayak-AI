@@ -48,6 +48,7 @@ class Session:
     relay: Any = None  # LiveRelay to the Gemini Live session, attached by /ws
     resume_handle: str | None = None  # reserved: Gemini session-resumption token
     audio_bytes_in: int = 0  # mic bytes received (diagnostic: is the browser streaming?)
+    lang: str = "hi"  # applicant's chosen language code (drives the agent's default)
     state: str = "open"
 
 
@@ -57,7 +58,7 @@ class SessionRegistry:
         os.makedirs(self.log_dir, exist_ok=True)
         self._sessions: dict[str, Session] = {}
 
-    def create(self, template: dict | None = None) -> Session:
+    def create(self, template: dict | None = None, lang: str = "hi") -> Session:
         sid = uuid.uuid4().hex
         log = WitnessLog(os.path.join(self.log_dir, f"{sid}.jsonl"))
         session = Session(
@@ -66,6 +67,7 @@ class SessionRegistry:
             outbound=asyncio.Queue(maxsize=OUTBOUND_MAXSIZE),
             form=FormState(template),
             vad=EnergyVAD(),
+            lang=lang,
         )
         self._sessions[sid] = session
         return session

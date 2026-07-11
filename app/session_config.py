@@ -82,16 +82,40 @@ def _fields_for_prompt(template: dict) -> str:
     return "\n".join(lines)
 
 
-def build_system_instruction(template: dict) -> str:
+# Language code (from the user panel) -> English name used in the prompt. The Live
+# model speaks the named language; the applicant picks it before the session starts.
+LANGUAGE_NAMES = {
+    "hi": "Hindi",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "bn": "Bengali",
+    "mr": "Marathi",
+    "kn": "Kannada",
+    "gu": "Gujarati",
+    "pa": "Punjabi",
+    "ml": "Malayalam",
+    "or": "Odia",
+    "ur": "Urdu",
+    "en": "English",
+}
+
+
+def language_name(lang: str | None) -> str:
+    return LANGUAGE_NAMES.get((lang or "hi").lower(), "Hindi")
+
+
+def build_system_instruction(template: dict, language: str = "Hindi") -> str:
     return f"""\
 You are Sahayak, a voice-first form-filling companion for people who may not read
 or write. You help them complete an official form by talking to them and by looking
 at their documents through a live camera. You are patient, warm, and speak in short,
 simple sentences.
 
-LANGUAGE: Speak the user's language. Default Hindi. If the user speaks Tamil, switch
-to Tamil instantly and continue — never announce the switch, just follow. Never
-require the user to read or write anything, and never ask them to spell anything.
+LANGUAGE: The applicant has chosen {language}. Speak {language} by default and keep
+to it. The field 'ask' texts below may be written in Hindi — translate them into
+{language} when you speak. If the user themselves switches to another Indian language
+mid-conversation, follow them instantly — never announce the switch. Never require
+the user to read or write anything, and never ask them to spell anything.
 
 THE FORM ({template["title"]}) — fill these fields in order:
 {_fields_for_prompt(template)}
@@ -102,9 +126,9 @@ FOR EACH FIELD:
   and dates must be exact. If you cannot see it clearly, ask them to hold it steady
   or closer — never guess.
 - If it is a VOICE field: ask the field's question and take the answer from speech.
-- THEN always confirm the value back by voice in their language:
-  "मैंने लिखा: <value> — सही है?" Wait for approval before moving on. If they say it
-  is wrong, ask again. Never advance an unconfirmed field.
+- THEN always confirm the value back by voice in {language}, e.g. the equivalent of
+  "I wrote: <value> — is that correct?" Wait for approval before moving on. If they
+  say it is wrong, ask again. Never advance an unconfirmed field.
 
 WHEN A FIELD IS CONFIRMED: call the record_field tool with the field_id, the exact
 value, and source ("document" if you read it from a card, "voice" if the user spoke
@@ -170,17 +194,18 @@ RECORD_FIELD_TOOL = build_record_field_tool(TEMPLATE)
 LIVE_MODEL = os.environ.get("SAHAYAK_LIVE_MODEL", "gemini-3.1-flash-live-preview")
 
 
-def live_config(template: dict | None = None) -> dict:
+def live_config(template: dict | None = None, lang: str | None = None) -> dict:
     """Build the LiveConnectConfig dict for google-genai (2.x) for a template.
 
     Returned as a plain dict so this module needs no google-genai import (keeps
     pure-logic tests import-light). ``app/live_session.py`` passes it to
-    ``client.aio.live.connect(config=...)``. Defaults to the seed TEMPLATE.
+    ``client.aio.live.connect(config=...)``. Defaults to the seed TEMPLATE and
+    Hindi; ``lang`` is the applicant's chosen language code (see LANGUAGE_NAMES).
     """
     template = template or TEMPLATE
     return {
         "response_modalities": ["AUDIO"],
-        "system_instruction": build_system_instruction(template),
+        "system_instruction": build_system_instruction(template, language_name(lang)),
         "input_audio_transcription": {},  # enable user-speech transcription (captions)
         "output_audio_transcription": {},  # enable agent-speech transcription (captions)
         "tools": build_tools(template),

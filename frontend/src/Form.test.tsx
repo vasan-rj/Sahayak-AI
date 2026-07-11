@@ -37,7 +37,7 @@ describe("Form", () => {
     });
     render(<Form form={s} />);
     expect(screen.getByTestId("value-applicant_name").textContent).toBe("RAJESH KUMAR");
-    expect(screen.getByTestId("source-applicant_name").textContent).toBe("📄");
+    expect(screen.getByTestId("source-applicant_name").getAttribute("title")).toBe("document");
   });
 
   it("shows the printable finale when complete", () => {
@@ -50,6 +50,6 @@ describe("Form", () => {
     });
     render(<Form form={s} />);
     expect(screen.getByTestId("form-done")).toBeTruthy();
-    expect(screen.getByTestId("source-nominee_name").textContent).toBe("🎤");
+    expect(screen.getByTestId("source-nominee_name").getAttribute("title")).toBe("voice");
   });
 });

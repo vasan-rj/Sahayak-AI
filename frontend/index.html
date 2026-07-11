@@ -3,10 +3,751 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sahayak</title>
+    <meta name="theme-color" content="#a8451f" />
+    <title>Sahayak — Talk. Show your card. Watch the form fill itself.</title>
+    <meta
+      name="description"
+      content="Sahayak is a voice-first tool that lets a person who can't read or write complete an official form by speaking and showing their documents to a camera — and watch it fill itself."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Mukta:wght@400;500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- No-JS fallback: never hide content behind a reveal that can't fire. -->
+    <noscript><style>.reveal { opacity: 1 !important; transform: none !important; }</style></noscript>
+    <style>
+      /* =========================================================
+         Sahayak — landing. Extends the app's design language:
+         warm paper, one terracotta accent, line icons, humanist
+         type. Adds an editorial display face (Fraunces) for the
+         marketing register — serious public-service instrument
+         with human warmth, not a toy.
+         ========================================================= */
+      :root {
+        color-scheme: light;
+        --paper: #f5f0e6;
+        --paper-2: #ece4d4;
+        --paper-3: #e5dbc6;
+        --card: #fffdf9;
+        --ink: #221c14;
+        --ink-soft: #6a5e4c;
+        --ink-faint: #9c8f78;
+        --line: #ded2ba;
+        --line-strong: #cabfa4;
+        --primary: #a8451f;
+        --primary-600: #8f3917;
+        --primary-tint: #f3e2d7;
+        --accent: #b9791f;
+        --green: #1f7a43;
+        --green-bg: #eaf3ec;
+        --green-line: #bcd8c4;
+        --red: #b23b2e;
+        --shadow: 0 6px 22px rgba(60, 42, 18, 0.09);
+        --shadow-sm: 0 2px 8px rgba(60, 42, 18, 0.07);
+        --shadow-lg: 0 24px 60px rgba(60, 42, 18, 0.16);
+        --r: 14px;
+        --r-sm: 9px;
+        --display: "Fraunces", Georgia, serif;
+        --ui: "Mukta", "Noto Sans Tamil", system-ui, -apple-system, sans-serif;
+        --maxw: 1120px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+      body {
+        margin: 0;
+        font-family: var(--ui);
+        color: var(--ink);
+        background: var(--paper);
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.55;
+        overflow-x: hidden;
+        /* faint paper grain */
+        background-image:
+          radial-gradient(1200px 600px at 82% -8%, rgba(184, 121, 31, 0.10), transparent 60%),
+          radial-gradient(900px 520px at -6% 8%, rgba(168, 69, 31, 0.07), transparent 55%),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      }
+
+      svg { display: block; }
+      a { color: inherit; text-decoration: none; }
+      ::selection { background: var(--primary); color: #fff; }
+
+      .wrap { width: min(100% - 2.4rem, var(--maxw)); margin-inline: auto; }
+
+      /* ---------- Icon base ---------- */
+      .ico { width: 1em; height: 1em; stroke: currentColor; stroke-width: 1.9; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+      /* ---------- Devanagari / Tamil script texture ---------- */
+      .script-bg {
+        position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
+      }
+      .script-bg span {
+        position: absolute;
+        font-family: var(--ui);
+        font-weight: 700;
+        color: var(--ink);
+        opacity: 0.045;
+        white-space: nowrap;
+        line-height: 1;
+        user-select: none;
+      }
+
+      /* ---------- Nav ---------- */
+      header.nav {
+        position: sticky; top: 0; z-index: 50;
+        backdrop-filter: saturate(1.1) blur(9px);
+        background: rgba(245, 240, 230, 0.78);
+        border-bottom: 1px solid transparent;
+        transition: border-color .25s ease, background .25s ease;
+      }
+      header.nav.scrolled { border-bottom-color: var(--line); background: rgba(245, 240, 230, 0.92); }
+      .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 66px; }
+      .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 700; }
+      .brand .mark { color: var(--primary); font-size: 1.7rem; display: grid; place-items: center; }
+      .brand .name { font-size: 1.3rem; letter-spacing: -0.01em; }
+      .brand .deva { color: var(--ink-soft); font-weight: 600; font-size: 1.05rem; }
+      .nav-links { display: flex; align-items: center; gap: 1.6rem; }
+      .nav-links a.link { font-weight: 600; font-size: 0.96rem; color: var(--ink-soft); transition: color .18s ease; }
+      .nav-links a.link:hover { color: var(--primary); }
+      .lang-chip {
+        font-weight: 600; font-size: 0.85rem; padding: 0.28rem 0.7rem; border-radius: 999px;
+        background: var(--paper-2); border: 1px solid var(--line-strong); color: var(--ink);
+      }
+      .btn {
+        display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--ui);
+        font-weight: 600; font-size: 0.98rem; padding: 0.68rem 1.15rem; border-radius: 999px;
+        border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+        transition: transform .16s ease, box-shadow .2s ease, background .2s ease;
+      }
+      .btn .ico { font-size: 1.05em; }
+      .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 3px 0 var(--primary-600); }
+      .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(168,69,31,.28); }
+      .btn-primary:active { transform: translateY(0); box-shadow: 0 2px 0 var(--primary-600); }
+      .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+      .btn-ghost:hover { background: var(--card); transform: translateY(-2px); }
+
+      /* ---------- Hero ---------- */
+      .hero { position: relative; padding: clamp(3rem, 8vh, 6rem) 0 clamp(3rem, 6vh, 5rem); }
+      .hero-grid {
+        position: relative; z-index: 2;
+        display: grid; grid-template-columns: 1.05fr 0.95fr; gap: clamp(2rem, 5vw, 4rem); align-items: center;
+      }
+      .eyebrow {
+        display: inline-flex; align-items: center; gap: 0.55rem; font-weight: 600; font-size: 0.82rem;
+        letter-spacing: 0.04em; text-transform: uppercase; color: var(--primary);
+        background: var(--primary-tint); border: 1px solid #e5c9b8; padding: 0.35rem 0.8rem; border-radius: 999px;
+      }
+      .eyebrow .pulse { width: 8px; height: 8px; border-radius: 999px; background: var(--primary); box-shadow: 0 0 0 0 rgba(168,69,31,.5); animation: pulse 2s infinite; }
+      @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(168,69,31,.45); } 70% { box-shadow: 0 0 0 8px rgba(168,69,31,0); } 100% { box-shadow: 0 0 0 0 rgba(168,69,31,0); } }
+
+      h1.headline {
+        font-family: var(--display); font-weight: 600; font-optical-sizing: auto;
+        font-size: clamp(2.5rem, 5.6vw, 4.3rem); line-height: 1.02; letter-spacing: -0.02em;
+        margin: 1.3rem 0 0; color: var(--ink);
+      }
+      h1.headline em { font-style: italic; color: var(--primary); font-weight: 500; }
+      .subhead { font-size: clamp(1.05rem, 1.6vw, 1.28rem); color: var(--ink-soft); max-width: 34ch; margin: 1.3rem 0 0; }
+      .hero-cta { display: flex; flex-wrap: wrap; gap: 0.85rem; margin-top: 1.9rem; }
+      .hero-meta { margin-top: 1.7rem; display: flex; flex-wrap: wrap; gap: 1.4rem 2rem; color: var(--ink-faint); font-size: 0.9rem; font-weight: 500; }
+      .hero-meta b { color: var(--ink); font-weight: 700; }
+
+      /* reveal on load */
+      .rise { opacity: 0; transform: translateY(16px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+      @keyframes rise { to { opacity: 1; transform: none; } }
+
+      /* ---------- Hero demo device ---------- */
+      .device {
+        position: relative; background: var(--card); border: 1px solid var(--line-strong);
+        border-radius: 22px; box-shadow: var(--shadow-lg); padding: 0.9rem; overflow: hidden;
+      }
+      .device::after {
+        content: ""; position: absolute; inset: 0; border-radius: 22px; pointer-events: none;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+      }
+      .device-cam {
+        position: relative; height: 178px; border-radius: 13px; overflow: hidden;
+        background: linear-gradient(155deg, #2a2113, #17110a); border: 1px solid #3a2e1c;
+        display: grid; place-items: center;
+      }
+      .device-cam .frameguide {
+        position: absolute; inset: 15% 20%; border: 2px dashed rgba(255,255,255,.4); border-radius: 10px;
+      }
+      /* the ID card shown to the camera */
+      .idcard {
+        position: relative; width: 60%; background: linear-gradient(135deg,#fbf6ec,#efe4cf);
+        border-radius: 8px; padding: 0.6rem 0.7rem; box-shadow: 0 10px 26px rgba(0,0,0,.45);
+        transform: rotate(-4deg) translateY(6px); border: 1px solid #d8c9a7;
+        opacity: 0; animation: card-in .8s ease forwards; animation-delay: .3s;
+      }
+      @keyframes card-in { to { opacity: 1; transform: rotate(-4deg) translateY(0); } }
+      .idcard .id-top { display: flex; align-items: center; gap: 0.35rem; font-size: 0.52rem; font-weight: 700; color: var(--primary-600); letter-spacing: .06em; }
+      .idcard .id-top .ico { font-size: 0.8rem; }
+      .idcard .id-name { font-weight: 700; font-size: 0.82rem; margin-top: 0.35rem; color: #2a2113; }
+      .idcard .id-sub { font-size: 0.56rem; color: #6a5e4c; margin-top: 0.1rem; }
+      .idcard .id-scan {
+        position: absolute; left: 0; right: 0; height: 34%;
+        background: linear-gradient(180deg, rgba(31,122,67,0) 0%, rgba(31,122,67,.28) 50%, rgba(31,122,67,0) 100%);
+        border-top: 1px solid rgba(31,122,67,.6); border-bottom: 1px solid rgba(31,122,67,.6);
+        animation: scan 2.6s ease-in-out infinite; animation-delay: 1s;
+      }
+      @keyframes scan { 0%,100% { top: 0; opacity: 0; } 20% { opacity: 1; } 50% { top: 66%; opacity: 1; } 80% { opacity: 0; } }
+
+      /* voice orb */
+      .orb {
+        position: absolute; bottom: 0.7rem; left: 0.7rem; width: 46px; height: 46px; border-radius: 999px;
+        display: grid; place-items: center; background: var(--green); color: #fff; border: 2px solid rgba(255,255,255,.85);
+        font-size: 1.15rem; z-index: 3;
+      }
+      .orb::before { content:""; position:absolute; inset:-2px; border-radius:999px; border:2px solid var(--green); animation: ring 1.6s ease-out infinite; }
+      @keyframes ring { 0% { transform: scale(1); opacity:.6; } 100% { transform: scale(1.9); opacity: 0; } }
+
+      /* transcript / form filling */
+      .device-body { padding: 0.85rem 0.55rem 0.35rem; }
+      .bubble {
+        display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.55rem;
+        font-size: 0.9rem; opacity: 0; transform: translateY(6px); animation: bubble-in .5s ease forwards;
+      }
+      .bubble .who { flex: none; width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; font-size: 0.72rem; color: #fff; margin-top: 1px; }
+      .bubble.agent .who { background: var(--primary); }
+      .bubble.user .who { background: var(--ink-soft); }
+      .bubble .txt { color: var(--ink); }
+      .bubble .txt .en { display: block; color: var(--ink-faint); font-size: 0.76rem; font-style: italic; }
+      @keyframes bubble-in { to { opacity: 1; transform: none; } }
+      .b1 { animation-delay: .6s; }
+      .b2 { animation-delay: 1.5s; }
+      .b3 { animation-delay: 3.3s; }
+
+      .field-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+        background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+        padding: 0.55rem 0.7rem; margin-top: 0.5rem;
+        opacity: 0; transform: translateY(6px); animation: bubble-in .5s ease forwards; animation-delay: 2.4s;
+      }
+      .field-row .fl { font-size: 0.7rem; color: var(--ink-soft); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+      .field-row .fv { font-weight: 700; font-size: 0.98rem; }
+      .field-row .conf {
+        display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.74rem; font-weight: 700;
+        color: var(--green); background: var(--green-bg); border: 1px solid var(--green-line);
+        padding: 0.2rem 0.5rem; border-radius: 999px; opacity: 0; animation: bubble-in .4s ease forwards; animation-delay: 3.9s;
+      }
+      .caption-live {
+        margin-top: 0.6rem; font-size: 0.72rem; color: var(--ink-faint); display: flex; align-items: center; gap: 0.4rem; font-weight: 600;
+      }
+      .caption-live .live-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--red); animation: pulse 1.4s infinite; }
+
+      /* floating tags around device */
+      .float-tag {
+        position: absolute; background: var(--card); border: 1px solid var(--line-strong);
+        border-radius: 999px; padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; color: var(--ink);
+        box-shadow: var(--shadow); display: flex; align-items: center; gap: 0.4rem; z-index: 3;
+      }
+      .float-tag .ico { color: var(--primary); font-size: 1rem; }
+      .ft-1 { top: 8%; right: -6%; animation: bob 4s ease-in-out infinite; }
+      .ft-2 { bottom: 14%; left: -8%; animation: bob 4.6s ease-in-out infinite; }
+      @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+      /* ---------- Section scaffolding ---------- */
+      section { position: relative; padding: clamp(3.4rem, 8vh, 6rem) 0; }
+      .sec-label {
+        display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.8rem;
+        letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary);
+      }
+      .sec-label::before { content: ""; width: 26px; height: 2px; background: var(--primary); border-radius: 2px; }
+      h2.sec-title {
+        font-family: var(--display); font-weight: 600; font-size: clamp(1.9rem, 3.7vw, 2.9rem);
+        line-height: 1.08; letter-spacing: -0.015em; margin: 0.85rem 0 0; max-width: 20ch;
+      }
+      h2.sec-title em { font-style: italic; color: var(--primary); font-weight: 500; }
+      .sec-intro { color: var(--ink-soft); font-size: 1.08rem; max-width: 52ch; margin-top: 1rem; }
+
+      /* reveal on scroll */
+      .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
+      .reveal.in { opacity: 1; transform: none; }
+
+      /* ---------- Problem band ---------- */
+      .band { background: var(--ink); color: #f3ead9; border-radius: 0; }
+      .band-quote {
+        font-family: var(--display); font-weight: 500; font-size: clamp(1.7rem, 4vw, 3rem); line-height: 1.16;
+        letter-spacing: -0.01em; max-width: 24ch;
+      }
+      .band-quote em { font-style: italic; color: #f0a86b; }
+      .band-sub { margin-top: 1.4rem; color: #c9b89b; font-size: 1.05rem; max-width: 52ch; }
+      .band .stats { display: flex; flex-wrap: wrap; gap: 2.4rem; margin-top: 2.4rem; }
+      .band .stat .n { font-family: var(--display); font-size: clamp(1.9rem,4vw,2.6rem); font-weight: 600; color: #f0a86b; line-height: 1; }
+      .band .stat .l { color: #c9b89b; font-size: 0.92rem; margin-top: 0.4rem; max-width: 22ch; }
+      .band .script-bg span { color: #fff; opacity: 0.05; }
+
+      /* ---------- The loop ---------- */
+      .loop-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-top: 2.6rem; counter-reset: step; }
+      .step {
+        position: relative; padding: 1.5rem 1.1rem 1.3rem; border-top: 2px solid var(--line-strong);
+      }
+      .step::before {
+        counter-increment: step; content: "0" counter(step);
+        font-family: var(--display); font-weight: 600; font-size: 0.95rem; color: var(--primary);
+        position: absolute; top: -0.95rem; left: 1.1rem; background: var(--paper); padding-right: 0.5rem;
+      }
+      .step .s-ico {
+        font-size: 1.7rem; color: var(--primary); width: 46px; height: 46px; border-radius: 12px;
+        background: var(--primary-tint); border: 1px solid #e5c9b8; display: grid; place-items: center; margin-bottom: 0.9rem;
+      }
+      .step h3 { font-size: 1.02rem; margin: 0 0 0.35rem; font-weight: 700; }
+      .step p { font-size: 0.9rem; color: var(--ink-soft); margin: 0; }
+      .step .deva { display: block; font-weight: 600; color: var(--ink); margin-top: 0.5rem; font-size: 0.9rem; }
+
+      /* ---------- Live capabilities (why not a chatbox) ---------- */
+      .cap-head { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: end; }
+      .cap-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 2.4rem; }
+      .cap {
+        position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+        padding: 1.5rem 1.5rem 1.4rem; box-shadow: var(--shadow-sm); overflow: hidden;
+        transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+      }
+      .cap:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: var(--line-strong); }
+      .cap .c-ico { font-size: 1.5rem; color: var(--primary); margin-bottom: 0.8rem; }
+      .cap h3 { margin: 0 0 0.4rem; font-size: 1.12rem; font-weight: 700; }
+      .cap p { margin: 0; color: var(--ink-soft); font-size: 0.95rem; }
+      .cap .tag { position: absolute; top: 1.2rem; right: 1.3rem; font-size: 0.72rem; font-weight: 700; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+      .anti-bar {
+        margin-top: 1.6rem; display: flex; gap: 0.8rem; align-items: flex-start; background: var(--primary-tint);
+        border: 1px solid #e5c9b8; border-radius: var(--r); padding: 1.1rem 1.3rem; color: var(--primary-600); font-weight: 500;
+      }
+      .anti-bar .ico { color: var(--primary); font-size: 1.3rem; flex: none; margin-top: 2px; }
+      .anti-bar b { color: var(--ink); }
+
+      /* ---------- Demo beats ---------- */
+      .beats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 2.6rem; }
+      .beat {
+        background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 1.4rem;
+        display: flex; flex-direction: column; gap: 0.5rem;
+      }
+      .beat .num { font-family: var(--display); font-size: 1.4rem; font-weight: 600; color: var(--primary); }
+      .beat h4 { margin: 0; font-size: 1.02rem; font-weight: 700; }
+      .beat p { margin: 0; font-size: 0.9rem; color: var(--ink-soft); }
+      .beat .proves { margin-top: auto; padding-top: 0.7rem; border-top: 1px dashed var(--line-strong); font-size: 0.82rem; color: var(--ink-faint); }
+      .beat .proves b { color: var(--green); font-weight: 700; }
+
+      /* ---------- Trust / boundaries ---------- */
+      .trust-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 2.4rem; align-items: start; }
+      .trust-list { list-style: none; padding: 0; margin: 1.8rem 0 0; display: grid; gap: 1rem; }
+      .trust-list li { display: flex; gap: 0.85rem; align-items: flex-start; }
+      .trust-list .ico { color: var(--green); font-size: 1.3rem; flex: none; margin-top: 2px; }
+      .trust-list b { display: block; margin-bottom: 0.15rem; }
+      .trust-list span.d { color: var(--ink-soft); font-size: 0.95rem; }
+      .honest {
+        background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 1.6rem 1.7rem;
+        box-shadow: var(--shadow-sm);
+      }
+      .honest .h-lab { font-weight: 700; font-size: 0.8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 0.5rem; }
+      .honest p { color: var(--ink-soft); font-size: 0.96rem; margin: 1rem 0 0; }
+      .honest p b { color: var(--ink); }
+
+      /* ---------- Run / footer CTA ---------- */
+      .run { background: var(--paper-2); border-top: 1px solid var(--line); }
+      .run-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.6rem; align-items: center; }
+      pre.code {
+        background: #1c150c; color: #ecdcc2; border-radius: var(--r); padding: 1.3rem 1.4rem; overflow-x: auto;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.86rem; line-height: 1.7; margin: 0;
+        border: 1px solid #3a2e1c; box-shadow: var(--shadow);
+      }
+      pre.code .c { color: #8f8368; }
+      pre.code .k { color: #f0a86b; }
+      .footer { padding: 2.4rem 0 3rem; border-top: 1px solid var(--line); color: var(--ink-soft); }
+      .footer-inner { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
+      .footer .fnote { font-size: 0.9rem; max-width: 46ch; }
+      .footer .fnote b { color: var(--ink); }
+
+      /* ---------- Responsive ---------- */
+      @media (max-width: 900px) {
+        .hero-grid { grid-template-columns: 1fr; }
+        .device { margin-top: 1rem; max-width: 440px; }
+        .ft-1 { right: 2%; } .ft-2 { left: 2%; }
+        .loop-grid { grid-template-columns: 1fr 1fr; }
+        .cap-head { grid-template-columns: 1fr; gap: 1rem; }
+        .cap-grid, .beats { grid-template-columns: 1fr 1fr; }
+        .trust-grid, .run-grid { grid-template-columns: 1fr; }
+        .nav-links .link { display: none; }
+      }
+      @media (max-width: 560px) {
+        .loop-grid, .cap-grid, .beats { grid-template-columns: 1fr; }
+        .hero-meta { gap: 0.9rem 1.4rem; }
+        .band .stats { gap: 1.4rem; }
+        .float-tag { display: none; }
+        .nav-links .lang-chip { display: none; }
+        .nav-inner { height: 60px; }
+        .brand .deva { display: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+        .rise, .reveal { opacity: 1 !important; transform: none !important; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- ============ NAV ============ -->
+    <header class="nav" id="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="#top">
+          <span class="mark" aria-hidden="true">
+            <svg class="ico" viewBox="0 0 24 24" style="width:1em;height:1em">
+              <rect x="3.5" y="2.5" width="13" height="19" rx="2.5" />
+              <path d="M7 7h6M7 10.5h6M7 14h3" />
+              <circle cx="17" cy="16.5" r="4.5" fill="var(--paper)" />
+              <path d="m15 16.5 1.5 1.5 3-3" />
+            </svg>
+          </span>
+          <span class="name">Sahayak</span>
+          <span class="deva">सहायक</span>
+        </a>
+        <nav class="nav-links">
+          <a class="link" href="#loop">The loop</a>
+          <a class="link" href="#live">Why Live</a>
+          <a class="link" href="#trust">Trust</a>
+          <a class="btn btn-ghost" href="/admin.html">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M6 2.5h8l4 4V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V2.5Z"/><path d="M14 2.5V6.5h4"/><path d="M9 12h6M9 15.5h6M9 8.5h2"/></svg>
+            Admin Panel
+          </a>
+          <a class="btn btn-primary" href="/app.html">
+            <svg class="ico" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/></svg>
+            User Panel
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <span id="top"></span>
+
+    <!-- ============ HERO ============ -->
+    <section class="hero">
+      <div class="script-bg" aria-hidden="true">
+        <span style="top:6%; left:60%; font-size:6rem">फॉर्म</span>
+        <span style="top:38%; left:3%; font-size:5rem">பென்ஷன்</span>
+        <span style="top:70%; left:48%; font-size:7rem">आधार</span>
+        <span style="top:88%; left:8%; font-size:4rem">நம்பிக்கை</span>
+      </div>
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow rise" style="animation-delay:.05s"><span class="pulse"></span> Google DeepMind Hackathon · Live API · PS1</span>
+          <h1 class="headline rise" style="animation-delay:.12s">
+            Talk. Show your card.<br /><em>Watch the form fill itself.</em>
+          </h1>
+          <p class="subhead rise" style="animation-delay:.2s">
+            A voice-first tool for the person who can't read or write the form. The agent reads it aloud, sees their documents through the camera, and fills every field — confirmed by voice, in their own language.
+          </p>
+          <div class="hero-cta rise" style="animation-delay:.28s">
+            <a class="btn btn-primary" href="/app.html">
+              <svg class="ico" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/></svg>
+              User Panel — fill a form
+            </a>
+            <a class="btn btn-ghost" href="/admin.html">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M6 2.5h8l4 4V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V2.5Z"/><path d="M14 2.5V6.5h4"/><path d="M9 12h6M9 15.5h6M9 8.5h2"/></svg>
+              Admin Panel
+            </a>
+          </div>
+          <div class="hero-meta rise" style="animation-delay:.36s">
+            <span><b>Hindi · Tamil</b> — switch mid-sentence</span>
+            <span><b>No typing.</b> No reading.</span>
+            <span><b>Every value confirmed</b> before it's saved</span>
+          </div>
+        </div>
+
+        <!-- Animated demo device -->
+        <div class="device rise" style="animation-delay:.3s" aria-hidden="true">
+          <div class="device-cam state-speaking">
+            <div class="frameguide"></div>
+            <div class="idcard">
+              <div class="id-top">
+                <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="12" r="2.4"/><path d="M13 10h5M13 14h5"/></svg>
+                AADHAAR
+              </div>
+              <div class="id-name">राजेश कुमार</div>
+              <div class="id-sub">DOB: 14 / 08 / 1979</div>
+              <div class="id-scan"></div>
+            </div>
+            <div class="orb">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5H4Z"/><path d="M16.5 9a4 4 0 0 1 0 6"/><path d="M19 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+            </div>
+          </div>
+          <div class="device-body">
+            <div class="bubble agent b1">
+              <span class="who">स</span>
+              <span class="txt">आधार कार्ड दिखाइए।<span class="en">"Show me your Aadhaar card."</span></span>
+            </div>
+            <div class="field-row">
+              <div>
+                <div class="fl">Name / नाम</div>
+                <div class="fv">राजेश कुमार</div>
+              </div>
+              <span class="conf">
+                <svg class="ico" viewBox="0 0 24 24" style="width:1em;height:1em"><path d="M4.5 12.5 10 18 20 6.5"/></svg>
+                confirmed
+              </span>
+            </div>
+            <div class="bubble agent b3">
+              <span class="who">स</span>
+              <span class="txt">मैंने लिखा: राजेश कुमार — सही है?<span class="en">"I wrote: Rajesh Kumar — is that correct?"</span></span>
+            </div>
+            <div class="caption-live"><span class="live-dot"></span> LIVE · English captions on</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PROBLEM BAND ============ -->
+    <section class="band">
+      <div class="script-bg" aria-hidden="true">
+        <span style="top:20%; left:65%; font-size:8rem">पेंशन</span>
+        <span style="top:60%; left:5%; font-size:6rem">ரேஷன்</span>
+      </div>
+      <div class="wrap" style="position:relative;z-index:2">
+        <p class="sec-label reveal" style="color:#f0a86b">The problem</p>
+        <p class="band-quote reveal">
+          In India, filling a form assumes you can read and write. <em>Hundreds of millions can't</em> — not the form's language, sometimes not any script.
+        </p>
+        <p class="band-sub reveal">
+          A pension, a bank account, a ration card depends on trusting a stranger to fill it for you. The help today is a harried clerk, a paid agent, or a relative on the phone. None of them can see your documents and confirm each value in your own language.
+        </p>
+        <div class="stats reveal">
+          <div class="stat"><div class="n">6 fields</div><div class="l">one wrong entry means a rejected application, another lost day of wages</div></div>
+          <div class="stat"><div class="n">2 languages</div><div class="l">Hindi ↔ Tamil, switched mid-session — no button, no reset</div></div>
+          <div class="stat"><div class="n">0 keystrokes</div><div class="l">the person never reads a word or writes a word</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ THE LOOP ============ -->
+    <section id="loop">
+      <div class="wrap">
+        <p class="sec-label reveal">How it works</p>
+        <h2 class="sec-title reveal">One conversation. <em>The form fills itself.</em></h2>
+        <p class="sec-intro reveal">
+          Accuracy-critical values — name spelling, date of birth — are read off a printed official document, the easiest vision task, not the hardest. Everything else is captured by voice. Each value shows on screen and is confirmed aloud before the next field.
+        </p>
+        <div class="loop-grid">
+          <div class="step reveal">
+            <div class="s-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5H4Z"/><path d="M16.5 9a4 4 0 0 1 0 6"/><path d="M19 6.5a7.5 7.5 0 0 1 0 11"/></svg></div>
+            <h3>Agent greets</h3>
+            <p>Explains the form's purpose out loud, in the user's language.</p>
+            <span class="deva">"चलिए फॉर्म भरते हैं।"</span>
+          </div>
+          <div class="step reveal" style="transition-delay:.08s">
+            <div class="s-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M6 2.5h8l4 4V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V2.5Z"/><path d="M14 2.5V6.5h4"/><path d="M9 12h6M9 15.5h6M9 8.5h2"/></svg></div>
+            <h3>Show the card</h3>
+            <p>Agent reads the name & DOB off the Aadhaar — the user never spells a thing.</p>
+            <span class="deva">"आधार दिखाइए।"</span>
+          </div>
+          <div class="step reveal" style="transition-delay:.16s">
+            <div class="s-ico"><svg class="ico" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/></svg></div>
+            <h3>Answer by voice</h3>
+            <p>Fields with no document — a nominee's name — are spoken and captured.</p>
+            <span class="deva">"அடுத்தது என்ன?"</span>
+          </div>
+          <div class="step reveal" style="transition-delay:.24s">
+            <div class="s-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M4.5 12.5 10 18 20 6.5"/></svg></div>
+            <h3>Confirm & fill</h3>
+            <p>"I wrote: Rajesh Kumar — correct?" On approval, the digital form fills live.</p>
+            <span class="deva">"सही है?"</span>
+          </div>
+          <div class="step reveal" style="transition-delay:.32s">
+            <div class="s-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M6.5 8.5V3h11v5.5"/><path d="M6.5 17H4a1 1 0 0 1-1-1V10a1.5 1.5 0 0 1 1.5-1.5h15A1.5 1.5 0 0 1 21 10v6a1 1 0 0 1-1 1h-2.5"/><rect x="6.5" y="14" width="11" height="7" rx="1"/></svg></div>
+            <h3>Ready to print</h3>
+            <p>The completed form renders clean and printable — every value logged with its source.</p>
+            <span class="deva">Done.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ WHY LIVE (not a chatbox) ============ -->
+    <section id="live" style="background:var(--paper-2); border-block:1px solid var(--line)">
+      <div class="wrap">
+        <div class="cap-head">
+          <div>
+            <p class="sec-label reveal">Why it can't be a chatbox</p>
+            <h2 class="sec-title reveal">It depends on <em>live sight and voice.</em></h2>
+          </div>
+          <p class="sec-intro reveal" style="margin-top:0">
+            All three Live API capabilities named in Problem Statement 1 are load-bearing here — remove any one and the tool collapses.
+          </p>
+        </div>
+        <div class="cap-grid">
+          <div class="cap reveal">
+            <span class="tag">Sees</span>
+            <div class="c-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <h3>Continuous vision</h3>
+            <p>The camera reads printed documents in real time — the core of the capture loop, not a one-shot upload.</p>
+          </div>
+          <div class="cap reveal" style="transition-delay:.08s">
+            <span class="tag">Hears</span>
+            <div class="c-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M4 5.5h16a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9l-4 3.5v-3.5H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"/><path d="M8 9.5v2M12 8.5v4M16 9.5v2"/></svg></div>
+            <h3>Barge-in & correction</h3>
+            <p>The user can interrupt mid-confirmation to fix a value; the agent stops and re-captures. A two-way conversation, not a form.</p>
+          </div>
+          <div class="cap reveal" style="transition-delay:.16s">
+            <span class="tag">Feels</span>
+            <div class="c-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M9 11a3 3 0 1 1 6 0c0 2-3 3-3 5"/><circle cx="12" cy="12" r="9.5"/></svg></div>
+            <h3>Reads vocal tone</h3>
+            <p>If the user sounds frustrated or confused, the agent slows down and reassures — before they give up.</p>
+          </div>
+          <div class="cap reveal" style="transition-delay:.24s">
+            <span class="tag">Translates</span>
+            <div class="c-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M4 6h8M8 4v2M9.5 6c0 4-3 6.5-5.5 7.5M6 9c0 2 2.5 4 5 4.5"/><path d="M13 20l4-9 4 9M14.5 16.5h5"/></svg></div>
+            <h3>Live Translate</h3>
+            <p>Switch Hindi ↔ Tamil mid-sentence and the agent follows — no toggle, no reset. English captions run throughout for observers.</p>
+          </div>
+        </div>
+        <div class="anti-bar reveal">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M12 3 22 20H2L12 3Z"/><path d="M12 9.5v5M12 17.5h.01"/></svg>
+          <span><b>The anti-bar is cleared.</b> Typed into a chatbox, Sahayak doesn't exist — it teaches nothing and completes a real official task by seeing documents and hearing speech in real time.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DEMO BEATS ============ -->
+    <section>
+      <div class="wrap">
+        <p class="sec-label reveal">The demo</p>
+        <h2 class="sec-title reveal">Four beats. <em>Under three minutes.</em></h2>
+        <div class="beats">
+          <div class="beat reveal">
+            <span class="num">01</span>
+            <h4>Read off the Aadhaar</h4>
+            <p>Hold the card up. The name appears in the form; the agent confirms it in Hindi.</p>
+            <div class="proves">Proves <b>document capture</b></div>
+          </div>
+          <div class="beat reveal" style="transition-delay:.08s">
+            <span class="num">02</span>
+            <h4>Tone shift</h4>
+            <p>"अरे यार, ये मुश्किल लगता है…" — the agent softens, unasked.</p>
+            <div class="proves">Proves <b>vocal tone</b></div>
+          </div>
+          <div class="beat reveal" style="transition-delay:.16s">
+            <span class="num">03</span>
+            <h4>Switch to Tamil</h4>
+            <p>Mid-sentence, the user switches language for a voice-sourced field. No button.</p>
+            <div class="proves">Proves <b>Live Translate</b></div>
+          </div>
+          <div class="beat reveal" style="transition-delay:.24s">
+            <span class="num">04</span>
+            <h4>Print the form</h4>
+            <p>Three fields — two from documents, one from voice — render as a finished form.</p>
+            <div class="proves">Proves <b>bounded assistance</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TRUST / BOUNDARIES ============ -->
+    <section id="trust" style="background:var(--paper-2); border-block:1px solid var(--line)">
+      <div class="wrap trust-grid">
+        <div>
+          <p class="sec-label reveal">The trust model</p>
+          <h2 class="sec-title reveal">Perception is probabilistic. <em>The record is deterministic.</em></h2>
+          <ul class="trust-list">
+            <li class="reveal">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M4.5 12.5 10 18 20 6.5"/></svg>
+              <div><b>Confirm before advance</b><span class="d">No field is saved without the user's spoken approval — that confirmation is the whole trust model.</span></div>
+            </li>
+            <li class="reveal" style="transition-delay:.06s">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M12 2.5 4 6v6c0 5 3.5 8 8 9.5 4.5-1.5 8-4.5 8-9.5V6l-8-3.5Z"/><path d="M9 12l2 2 4-4.5"/></svg>
+              <div><b>Read documents, don't guess</b><span class="d">Printed official cards are far more reliable than handwriting. The agent never invents a value it can't see or hear.</span></div>
+            </li>
+            <li class="reveal" style="transition-delay:.12s">
+              <svg class="ico" viewBox="0 0 24 24"><rect x="3.5" y="2.5" width="13" height="19" rx="2.5"/><path d="M7 7h6M7 10.5h6M7 14h3"/><circle cx="17" cy="16.5" r="4.5" fill="var(--paper-2)"/><path d="m15 16.5 1.5 1.5 3-3"/></svg>
+              <div><b>Append-only capture log</b><span class="d">One entry per confirmed value, with its source — document or voice — hash-chained and tamper-evident. Every value traces to how it was captured.</span></div>
+            </li>
+          </ul>
+        </div>
+        <div class="honest reveal">
+          <div class="h-lab">
+            <svg class="ico" viewBox="0 0 24 24" style="width:1em;height:1em"><circle cx="12" cy="12" r="9.5"/><path d="M12 8v5M12 16h.01"/></svg>
+            Honest boundaries
+          </div>
+          <p><b>It doesn't replace the human channel.</b> For a fully illiterate user there's still a submit / thumbprint step. What Sahayak fixes is the <b>capture</b>: accurate, in-language, and confirmed by the applicant instead of taken on faith from a middleman.</p>
+          <p><b>Session content is ephemeral</b>; the capture log stays local. Production adds on-device redaction of ID numbers before frames leave the phone.</p>
+          <p><b>One baked-in template today.</b> Generalizing — parsing any uploaded form into a field-map — is the near-term step, pitched as roadmap, not overclaimed as built.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ RUN IT ============ -->
+    <section class="run">
+      <div class="wrap run-grid">
+        <div>
+          <p class="sec-label reveal">Run it</p>
+          <h2 class="sec-title reveal" style="max-width:16ch">One laptop, one phone, one printed form.</h2>
+          <p class="sec-intro reveal">
+            Three tiers — browser (React) ↔ FastAPI proxy ↔ Gemini Live API. The proxy keeps the key server-side and owns the deterministic record. No database, no queue, no GPU.
+          </p>
+          <div class="hero-cta reveal" style="margin-top:1.6rem">
+            <a class="btn btn-primary" href="/app.html">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5-13-7.5Z" fill="currentColor" stroke="none"/></svg>
+              Open the app
+            </a>
+            <a class="btn btn-ghost" href="/admin.html">View capture log</a>
+          </div>
+        </div>
+        <pre class="code reveal"><span class="c"># backend</span>
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+<span class="k">export</span> GOOGLE_API_KEY=...
+
+<span class="c"># frontend</span>
+cd frontend && npm install && npm run build && cd ..
+
+<span class="c"># serve UI + WS at http://localhost:8000</span>
+uvicorn app.main:app --port 8000</pre>
+      </div>
+    </section>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="footer">
+      <div class="wrap footer-inner">
+        <a class="brand" href="#top">
+          <span class="mark" aria-hidden="true">
+            <svg class="ico" viewBox="0 0 24 24" style="width:1em;height:1em">
+              <rect x="3.5" y="2.5" width="13" height="19" rx="2.5" />
+              <path d="M7 7h6M7 10.5h6M7 14h3" />
+              <circle cx="17" cy="16.5" r="4.5" fill="var(--paper)" />
+              <path d="m15 16.5 1.5 1.5 3-3" />
+            </svg>
+          </span>
+          <span class="name">Sahayak</span>
+          <span class="deva">सहायक</span>
+        </a>
+        <p class="fnote">
+          <b>Built solo</b> at the Google DeepMind Bangalore Hackathon · Problem Statement 1 · Gemini Live API + Live Translate. Voice-first form completion for the people the digital economy can't reach.
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // Nav shadow on scroll
+      const nav = document.getElementById("nav");
+      const onScroll = () => nav.classList.toggle("scrolled", window.scrollY > 12);
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+
+      // Scroll-reveal. Fallback: if IntersectionObserver is missing, reveal all.
+      const reveals = document.querySelectorAll(".reveal");
+      if (!("IntersectionObserver" in window)) {
+        reveals.forEach((el) => el.classList.add("in"));
+      } else {
+        const io = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+            });
+          },
+          { threshold: 0.1, rootMargin: "0px 0px -6% 0px" }
+        );
+        reveals.forEach((el) => io.observe(el));
+      }
+    </script>
   </body>
 </html>

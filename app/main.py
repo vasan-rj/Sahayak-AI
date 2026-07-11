@@ -53,6 +53,21 @@ registry = SessionRegistry()
 store = get_store()
 
 
+@app.middleware("http")
+async def _no_cache_html(request, call_next):
+    """Never let the browser cache an HTML entry. The JS/CSS bundles are
+    content-hashed (safe to cache forever), but a stale cached ``app.html`` would
+    keep loading an OLD bundle — e.g. one that opens ``/ws`` without the selected
+    ``?template=`` and so fills the wrong form. Always revalidate the HTML shell."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "sessions": len(registry), "model": LIVE_MODEL}
@@ -70,6 +85,12 @@ async def template(id: str | None = None) -> dict:
     return store.get_active()
 
 
+@app.get("/templates")
+async def templates() -> list[dict]:
+    """Public list of forms the user panel offers (id, title, field_count, active)."""
+    return store.list_templates()
+
+
 def _select_template(websocket: WebSocket) -> dict:
     """Applicant fills the active template, or ``/ws?template=<id>`` for a specific one."""
     tid = websocket.query_params.get("template")
@@ -79,6 +100,11 @@ def _select_template(websocket: WebSocket) -> dict:
         except KeyError:
             pass
     return store.get_active()
+
+
+def _select_lang(websocket: WebSocket) -> str:
+    """Applicant's chosen language code from ``/ws?lang=<code>`` (default Hindi)."""
+    return websocket.query_params.get("lang") or "hi"
 
 
 def _make_client():
@@ -100,7 +126,7 @@ async def _default_relay_cm(session: Session, callbacks: dict):
     client = _make_client()
     if client is None:
         raise RuntimeError("GOOGLE_API_KEY not set")
-    config = live_config(session.form.template)  # per-template instruction + tools
+    config = live_config(session.form.template, session.lang)  # per-template + language
     async with client.aio.live.connect(model=LIVE_MODEL, config=config) as gsession:
         yield LiveRelay(gsession, **callbacks)
 
@@ -215,7 +241,7 @@ async def _pump_browser_to_relay(session: Session, relay: LiveRelay) -> None:
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
-    session = registry.create(template=_select_template(websocket))
+    session = registry.create(template=_select_template(websocket), lang=_select_lang(websocket))
     session.ws = websocket
     session.log.append("session_start", {"session_id": session.id})
     session.outbound.put_nowait(form_snapshot_event(session.form.snapshot()))
@@ -257,6 +283,8 @@ async def ws_endpoint(websocket: WebSocket) -> None:
 
 
 # Serve the built frontend if present (mounted last so it never shadows the API).
+# index.html IS the marketing landing (with the User / Admin choices); html=True
+# serves it at "/". The applicant app is app.html, the dashboard is admin.html.
 _FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.isdir(_FRONTEND_DIST):
     from fastapi.staticfiles import StaticFiles

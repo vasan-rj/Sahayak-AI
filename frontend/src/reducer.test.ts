@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reducer } from "./App";
+import { reducer } from "./SessionView";
 import type { FormSnapshot } from "./useWebSocket";
 
 const initial = {
@@ -7,6 +7,7 @@ const initial = {
   agentCaption: "",
   userCaption: "",
   lang: "hi",
+  lastSide: null as "agent" | "user" | null,
   complete: false,
   error: null as string | null,
 };

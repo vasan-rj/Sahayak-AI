@@ -38,6 +38,11 @@ export function useWebSocket(url: string, onEvent: (e: ServerEvent) => void) {
   onEventRef.current = onEvent;
 
   useEffect(() => {
+    // Empty url = not ready yet (session gated behind the Start gesture). Stay idle.
+    if (!url) {
+      setStatus("connecting");
+      return;
+    }
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
     ref.current = ws;
