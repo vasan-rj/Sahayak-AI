@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
 from .admin import router as admin_router
 from .env import load_dotenv
-from .live_session import LiveRelay
+from .live_session import LiveRelay, _closure_code
 from .markers import parse_and_strip
 from .protocol import (
     audio_event,
@@ -182,20 +182,31 @@ async def _pump_browser_to_relay(session: Session, relay: LiveRelay) -> None:
         frame = decode(message)
         if frame.kind == "binary" and frame.raw:
             tag, payload = frame.raw[0], frame.raw[1:]
-            if tag == MEDIA_AUDIO:
-                # Proxy-side VAD: bracket each utterance with activity_start/end
-                # (automatic VAD is off — it doesn't segment this stream).
-                session.audio_bytes_in += len(payload)
-                ev = session.vad.process(payload, chunk_ms(payload))
-                if ev == "start":
-                    await relay.activity_start()
-                if session.vad.speaking or ev == "end":
-                    await relay.send_audio(payload)
-                if ev == "end":
-                    await relay.activity_end()
-            elif tag == MEDIA_VIDEO:
-                await relay.send_frame(payload)
-            # unknown tag: ignore
+            try:
+                if tag == MEDIA_AUDIO:
+                    # Proxy-side VAD: bracket each utterance with activity_start/end
+                    # (automatic VAD is off — it doesn't segment this stream).
+                    session.audio_bytes_in += len(payload)
+                    ev = session.vad.process(payload, chunk_ms(payload))
+                    if ev == "start":
+                        await relay.activity_start()
+                    if session.vad.speaking or ev == "end":
+                        await relay.send_audio(payload)
+                    if ev == "end":
+                        await relay.activity_end()
+                elif tag == MEDIA_VIDEO:
+                    # Only send frames BETWEEN turns. Realtime video sent inside an
+                    # activity (speech) window is rejected by the Live API (1007
+                    # "Precondition check failed"), so never send while speaking.
+                    if not session.vad.speaking:
+                        await relay.send_frame(payload)
+                # unknown tag: ignore
+            except Exception as exc:  # noqa: BLE001 - a remote close is not a pump fault
+                code = _closure_code(exc)
+                if code is None:
+                    raise  # genuine bug -> propagate
+                log.info("Live socket closed (code %s) during send; ending pump", code)
+                return
         elif frame.error:
             session.outbound.put_nowait({"type": "error", "detail": frame.error})
         # text control frames (e.g. {"type":"start"}) need no action in the skeleton

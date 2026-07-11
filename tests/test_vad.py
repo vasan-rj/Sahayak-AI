@@ -75,3 +75,40 @@ def test_pump_logic_brackets_audio_with_activity_markers():
     asyncio.run(run())
     assert mock.activity == ["start", "end"]
     assert len(mock.audio_sent) >= 2  # speech chunks forwarded to the session
+
+
+def test_video_never_sent_during_speech_window():
+    """Regression for the 1007 crash: realtime video inside an activity (speech)
+    window is rejected by the Live API, so the pump must only send frames while
+    NOT speaking."""
+    mock = MockLiveSession([])
+    relay = LiveRelay(mock)
+    vad = EnergyVAD(start_rms=700, end_rms=400, silence_ms=300)
+
+    async def pump_audio(chunk):
+        ev = vad.process(chunk, chunk_ms(chunk))
+        if ev == "start":
+            await relay.activity_start()
+        if vad.speaking or ev == "end":
+            await relay.send_audio(chunk)
+        if ev == "end":
+            await relay.activity_end()
+
+    async def pump_video(frame):
+        if not vad.speaking:
+            await relay.send_frame(frame)
+
+    async def run():
+        await pump_video(b"F1")  # silent -> sent
+        await pump_audio(LOUD)  # speech starts
+        await pump_video(b"F2")  # speaking -> dropped
+        await pump_audio(LOUD)
+        await pump_video(b"F3")  # speaking -> dropped
+        await pump_audio(QUIET)
+        await pump_audio(QUIET)
+        await pump_audio(QUIET)  # silence window -> "end"
+        await pump_video(b"F4")  # silent again -> sent
+
+    asyncio.run(run())
+    assert mock.video_sent == [b"F1", b"F4"]  # nothing sent during the speech window
+    assert mock.activity == ["start", "end"]
