@@ -139,8 +139,11 @@ FORM_COMPLETE_TOOL = {
     "parameters": {"type": "object", "properties": {}},
 }
 
-# --- Live model (env-overridable; confirm exact id at the venue) --------------
-LIVE_MODEL = os.environ.get("SAHAYAK_LIVE_MODEL", "gemini-live-2.5-flash-preview")
+# --- Live model (env-overridable) ---------------------------------------------
+# gemini-3.1-flash-live-preview verified working (connect + tools + transcription
+# + audio) via scripts/smoke_live.py. Other Live models on the account:
+# gemini-3.5-live-translate-preview (Live Translate), gemini-2.5-flash-native-audio-*.
+LIVE_MODEL = os.environ.get("SAHAYAK_LIVE_MODEL", "gemini-3.1-flash-live-preview")
 
 
 def live_config(system_instruction: str | None = None) -> dict:
