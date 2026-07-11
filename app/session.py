@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .form_state import FormState
+from .vad import EnergyVAD
 from .witness_log import WitnessLog
 
 OUTBOUND_MAXSIZE = 100
@@ -42,9 +43,11 @@ class Session:
     log: WitnessLog
     outbound: "asyncio.Queue[dict]"
     form: FormState
+    vad: EnergyVAD
     ws: Any = None  # live WebSocket, attached by the /ws handler after accept
     relay: Any = None  # LiveRelay to the Gemini Live session, attached by /ws
     resume_handle: str | None = None  # reserved: Gemini session-resumption token
+    audio_bytes_in: int = 0  # mic bytes received (diagnostic: is the browser streaming?)
     state: str = "open"
 
 
@@ -62,6 +65,7 @@ class SessionRegistry:
             log=log,
             outbound=asyncio.Queue(maxsize=OUTBOUND_MAXSIZE),
             form=FormState(template),
+            vad=EnergyVAD(),
         )
         self._sessions[sid] = session
         return session

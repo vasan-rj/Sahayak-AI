@@ -184,15 +184,9 @@ def live_config(template: dict | None = None) -> dict:
         "input_audio_transcription": {},  # enable user-speech transcription (captions)
         "output_audio_transcription": {},  # enable agent-speech transcription (captions)
         "tools": build_tools(template),
-        # Reactive turn-taking: automatic VAD stays on (so the user can barge in and
-        # the model pauses itself), with high sensitivity and a short trailing
-        # silence so the agent answers quickly once the user stops talking.
-        "realtime_input_config": {
-            "automatic_activity_detection": {
-                "start_of_speech_sensitivity": "START_SENSITIVITY_HIGH",
-                "end_of_speech_sensitivity": "END_SENSITIVITY_HIGH",
-                "prefix_padding_ms": 200,
-                "silence_duration_ms": 450,
-            },
-        },
+        # Automatic VAD does not segment our streamed mic audio for this model
+        # (verified: real speech under auto-VAD, even at HIGH sensitivity, yields no
+        # turn). Turn it OFF — the proxy's energy VAD sends activity_start/end
+        # around each utterance instead (see app/vad.py + main.py).
+        "realtime_input_config": {"automatic_activity_detection": {"disabled": True}},
     }

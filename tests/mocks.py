@@ -38,16 +38,21 @@ class MockLiveSession:
         self.video_sent: list[bytes] = []
         self.tool_responses: list = []
         self.client_content: list = []
+        self.activity: list = []  # "start"/"end" in order
         self.closed = False
 
     async def send_client_content(self, *, turns=None, turn_complete=True):
         self.client_content.append((turns, turn_complete))
 
-    async def send_realtime_input(self, *, audio=None, video=None, **kw):
+    async def send_realtime_input(self, *, audio=None, video=None, activity_start=None, activity_end=None, **kw):
         if audio is not None:
             self.audio_sent.append(audio.data if hasattr(audio, "data") else audio)
         if video is not None:
             self.video_sent.append(video.data if hasattr(video, "data") else video)
+        if activity_start is not None:
+            self.activity.append("start")
+        if activity_end is not None:
+            self.activity.append("end")
 
     async def receive(self):
         if self._turns:

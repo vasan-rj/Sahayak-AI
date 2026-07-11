@@ -103,6 +103,14 @@ class LiveRelay:
             turn_complete=end_of_turn,
         )
 
+    # Manual turn boundaries (automatic VAD is disabled — it doesn't segment our
+    # audio). The proxy's energy VAD calls these around each user utterance.
+    async def activity_start(self) -> None:
+        await self._session.send_realtime_input(activity_start=types.ActivityStart())
+
+    async def activity_end(self) -> None:
+        await self._session.send_realtime_input(activity_end=types.ActivityEnd())
+
     # --- Gemini -> proxy ------------------------------------------------------
     async def receive_loop(self) -> None:
         try:

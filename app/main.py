@@ -31,6 +31,7 @@ from .protocol import (
 from .session import Session, SessionRegistry
 from .session_config import LIVE_MODEL, field_source, live_config
 from .template_store import get_store
+from .vad import chunk_ms
 
 log = logging.getLogger("sahayak")
 
@@ -182,7 +183,16 @@ async def _pump_browser_to_relay(session: Session, relay: LiveRelay) -> None:
         if frame.kind == "binary" and frame.raw:
             tag, payload = frame.raw[0], frame.raw[1:]
             if tag == MEDIA_AUDIO:
-                await relay.send_audio(payload)
+                # Proxy-side VAD: bracket each utterance with activity_start/end
+                # (automatic VAD is off — it doesn't segment this stream).
+                session.audio_bytes_in += len(payload)
+                ev = session.vad.process(payload, chunk_ms(payload))
+                if ev == "start":
+                    await relay.activity_start()
+                if session.vad.speaking or ev == "end":
+                    await relay.send_audio(payload)
+                if ev == "end":
+                    await relay.activity_end()
             elif tag == MEDIA_VIDEO:
                 await relay.send_frame(payload)
             # unknown tag: ignore
@@ -228,6 +238,9 @@ async def ws_endpoint(websocket: WebSocket) -> None:
             session.log.append("session_end", {"session_id": session.id})
         except OSError:
             pass
+        # Diagnostic: if this is ~0 the browser never streamed mic audio (frontend
+        # capture problem), not a VAD/turn-taking problem.
+        log.info("session %s ended: mic bytes in=%d", session.id, session.audio_bytes_in)
         session.state = "closed"
         registry.remove(session.id)
 
