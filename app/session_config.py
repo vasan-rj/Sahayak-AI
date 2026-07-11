@@ -1,81 +1,159 @@
-"""Session configuration — the most important file in the repo (stub for now).
+"""Session configuration — the make-or-break file (v2, voice-first).
 
-Carries the form map, the system instruction that engineers the proactive
-interruption, and the structured catch schema. The Gemini Live session config
-(model, response modality, VAD, transcription) gets wired on top of these
-constants in the next build block; nothing here imports google-genai yet.
+Carries the hardcoded template field-map, the voice-first system instruction, the
+structured-capture tool declarations, and the Gemini Live session config builder.
+
+v2 mechanism: the agent reads documents / hears speech and, when a field is
+confirmed by the user, calls the ``record_field`` tool with a structured value and
+its source (document|voice). ``form_complete`` fires when every field is confirmed.
+Tool-calling is the primary capture path (robust, language-agnostic); the
+``[[FIELD:...]]`` marker parser in ``markers.py`` is a fallback only.
 """
 
 from __future__ import annotations
 
-import re
+import os
 
-# The demo form is a mock prop: "Jan Kalyan Pension Yojana", form no. JKP-2A.
-# id -> label / expected content / trap role. This exact map is injected into the
-# system instruction so the model can judge field content against expectation.
-FORM_MAP = [
-    {"id": "applicant_name", "label": "Name of Applicant / आवेदक का नाम",
-     "expected": "The applicant's own full name", "trap": "anchor field, filled first"},
-    {"id": "father_name", "label": "Father's / Husband's Name / पिता-पति का नाम",
-     "expected": "The applicant's father's name — MUST differ from applicant_name",
-     "trap": "AC-2 TRAP: user writes their own name here"},
-    {"id": "dob", "label": "Date of Birth (DD/MM/YYYY)",
-     "expected": "A date in exact DD/MM/YYYY format", "trap": "format trap in reserve"},
-    {"id": "address", "label": "Full Postal Address",
-     "expected": "A postal address, up to two lines", "trap": "multi-line read"},
-    {"id": "bank_ifsc", "label": "Bank IFSC Code",
-     "expected": "An 11-character IFSC code", "trap": "jargon field — explain plainly"},
-    {"id": "nominee_name", "label": "Nominee Name / नामांकित व्यक्ति",
-     "expected": "A nominee's name", "trap": "AC-4 TRAP: left empty; verify must flag"},
-    {"id": "nominee_relation", "label": "Relation with Nominee",
-     "expected": "A relation word", "trap": "empty with nominee_name; flagged together"},
-    {"id": "declaration_sign", "label": "Signature / Thumb Impression",
-     "expected": "A signature or thumb impression", "trap": "advise: sign only after verify"},
-]
+# --- The hardcoded template (one form, no admin-upload UI) --------------------
+# From context/new/TEMPLATE_AND_PROMPT.md. Two document-sourced fields + one
+# voice-sourced field, so the demo is not "just an OCR app".
+TEMPLATE = {
+    "template_id": "jkp_pension_2a",
+    "title": "Jan Kalyan Pension Yojana — Application",
+    "fields": [
+        {
+            "id": "applicant_name",
+            "label": "Name of Applicant",
+            "type": "document",
+            "source_doc": "aadhaar",
+            "extract": "full name exactly as printed",
+            "ask": "अपना आधार कार्ड कैमरे के सामने दिखाइए।",
+        },
+        {
+            "id": "dob",
+            "label": "Date of Birth",
+            "type": "document",
+            "source_doc": "aadhaar",
+            "extract": "date of birth in DD/MM/YYYY",
+            "ask": "आधार कार्ड पर आपकी जन्मतिथि देख लेता हूँ।",
+        },
+        {
+            "id": "nominee_name",
+            "label": "Nominee Name",
+            "type": "voice",
+            "extract": "the name the user speaks",
+            "ask": "आप किसे nominee बनाना चाहते हैं? उनका नाम बताइए।",
+        },
+    ],
+}
 
-SYSTEM_INSTRUCTION = """\
-You are Sahayak, a form-filling companion. You are watching a paper form through a
-camera while the user fills it in.
+FIELD_IDS = [f["id"] for f in TEMPLATE["fields"]]
 
-Speak the user's language (Hindi or Tamil — follow their switch instantly). Short
-sentences, plain words, one field at a time.
+# Source inferred from a field's type — used by the marker fallback path, which
+# (unlike the record_field tool) carries no explicit source.
+FIELD_SOURCE = {
+    f["id"]: ("document" if f["type"] == "document" else "voice")
+    for f in TEMPLATE["fields"]
+}
 
-CRITICAL: you are not a passive assistant. Whenever the video shows writing that
-contradicts a field's expected content, INTERRUPT IMMEDIATELY without being asked,
-name the field, say what is wrong and what to write instead. Do not wait for a
-question. Do not batch corrections. In particular, father_name must differ from
-applicant_name.
 
-If the user's voice sounds frustrated or confused, slow down, simplify, reassure.
+def _fields_for_prompt() -> str:
+    lines = []
+    for f in TEMPLATE["fields"]:
+        if f["type"] == "document":
+            lines.append(
+                f'- {f["id"]} ("{f["label"]}"): DOCUMENT from {f["source_doc"]} — '
+                f'extract {f["extract"]}. Ask: "{f["ask"]}"'
+            )
+        else:
+            lines.append(
+                f'- {f["id"]} ("{f["label"]}"): VOICE — {f["extract"]}. Ask: "{f["ask"]}"'
+            )
+    return "\n".join(lines)
 
-Never invent field contents you cannot see; say you cannot see clearly and ask
-them to adjust the camera.
 
-When you catch a mistake, call the flag_field tool with the field id and a one-line
-issue so the record captures it.
+SYSTEM_INSTRUCTION = f"""\
+You are Sahayak, a voice-first form-filling companion for people who may not read
+or write. You help them complete an official form by talking to them and by looking
+at their documents through a live camera. You are patient, warm, and speak in short,
+simple sentences.
+
+LANGUAGE: Speak the user's language. Default Hindi. If the user speaks Tamil, switch
+to Tamil instantly and continue — never announce the switch, just follow. Never
+require the user to read or write anything, and never ask them to spell anything.
+
+THE FORM — fill these fields in order:
+{_fields_for_prompt()}
+
+FOR EACH FIELD:
+- If it is a DOCUMENT field: ask the user to show the named document to the camera
+  (use the field's ask text). Look at the document and read the exact value. Names
+  and dates must be exact. If you cannot see it clearly, ask them to hold it steady
+  or closer — never guess.
+- If it is a VOICE field: ask the field's question and take the answer from speech.
+- THEN always confirm the value back by voice in their language:
+  "मैंने लिखा: <value> — सही है?" Wait for approval before moving on. If they say it
+  is wrong, ask again. Never advance an unconfirmed field.
+
+WHEN A FIELD IS CONFIRMED: call the record_field tool with the field_id, the exact
+value, and source ("document" if you read it from a card, "voice" if the user spoke
+it). Speak the natural confirmation as usual — the tool call is in addition to, not
+instead of, talking to the user.
+
+WHEN ALL FIELDS ARE CONFIRMED: call the form_complete tool.
+
+TONE: If the user's voice sounds frustrated, confused, or tired, slow down, use
+simpler words, and reassure them ("कोई बात नहीं, मैं हूँ ना, धीरे-धीरे करते हैं").
+Respond to how they feel, not only to what they say.
+
+NEVER invent a value you cannot see or did not hear. NEVER ask the user to read the
+form. Keep spoken turns short.
 """
 
-# Structured catch — a tool/function-call schema, NOT transcript regex-scraping.
-# ASR will not reliably emit a literal marker across Hindi/Tamil, so the catch is
-# a typed event that drops straight into the witness log as an `interruption`.
-FLAG_FIELD_TOOL = {
-    "name": "flag_field",
-    "description": "Flag a form field whose written content contradicts its expected content.",
+# --- Structured-capture tools (primary path) ---------------------------------
+RECORD_FIELD_TOOL = {
+    "name": "record_field",
+    "description": "Record a form field value AFTER the user has confirmed it out loud.",
     "parameters": {
         "type": "object",
         "properties": {
-            "field": {"type": "string", "description": "The field id from the form map."},
-            "issue": {"type": "string", "description": "One-line description of what is wrong."},
+            "field_id": {
+                "type": "string",
+                "enum": FIELD_IDS,
+                "description": "Which form field this value fills.",
+            },
+            "value": {"type": "string", "description": "The exact confirmed value."},
+            "source": {
+                "type": "string",
+                "enum": ["document", "voice"],
+                "description": "Where the value came from: a document read by camera, or the user's speech.",
+            },
         },
-        "required": ["field", "issue"],
+        "required": ["field_id", "value", "source"],
     },
 }
 
-# Fallback only: if a build ends up relying on transcript markers, parse [[CATCH:field]].
-CATCH_MARKER_RE = re.compile(r"\[\[CATCH:(?P<field>[a-z_]+)\]\]")
+FORM_COMPLETE_TOOL = {
+    "name": "form_complete",
+    "description": "Signal that every field has been captured and confirmed.",
+    "parameters": {"type": "object", "properties": {}},
+}
+
+# --- Live model (env-overridable; confirm exact id at the venue) --------------
+LIVE_MODEL = os.environ.get("SAHAYAK_LIVE_MODEL", "gemini-live-2.5-flash-preview")
 
 
-def form_map_text() -> str:
-    """Render the form map for injection into the system instruction."""
-    lines = [f"- {f['id']} ({f['label']}): {f['expected']} [{f['trap']}]" for f in FORM_MAP]
-    return "FORM MAP:\n" + "\n".join(lines)
+def live_config(system_instruction: str | None = None) -> dict:
+    """Build the LiveConnectConfig dict for google-genai (2.x).
+
+    Returned as a plain dict so this module needs no google-genai import (keeps
+    pure-logic tests import-light). ``app/live_session.py`` passes it to
+    ``client.aio.live.connect(config=...)``.
+    """
+    return {
+        "response_modalities": ["AUDIO"],
+        "system_instruction": system_instruction or SYSTEM_INSTRUCTION,
+        "input_audio_transcription": {},  # enable user-speech transcription (captions)
+        "output_audio_transcription": {},  # enable agent-speech transcription (captions)
+        "tools": [{"function_declarations": [RECORD_FIELD_TOOL, FORM_COMPLETE_TOOL]}],
+    }

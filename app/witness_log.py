@@ -35,11 +35,11 @@ KINDS = frozenset(
     {
         "session_start",
         "session_end",
-        "field_explained",
-        "interruption",
+        "greeting",
+        "field_captured",  # a confirmed field value {field, value, source}
+        "form_complete",
         "language_switch",
         "tone_adapt",
-        "verify_verdict",
     }
 )
 

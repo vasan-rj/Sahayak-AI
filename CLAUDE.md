@@ -4,54 +4,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**Sahayak** — a solo build for the Google DeepMind Bangalore Hackathon (2026-07-11), Problem Statement 1 (Gemini Live API + Live Translate). A real-time multimodal agent: a phone camera watches a paper form on the table, the agent explains it in the user's spoken language (Hindi/Tamil), and **interrupts the moment a field is filled wrong** — before a clerk would reject it.
+**Sahayak** — a solo build for the Google DeepMind Bangalore Hackathon (2026-07-11), Problem Statement 1 (Gemini Live API + Live Translate).
 
-As of this file's writing the project is **pre-code**: only planning docs and this repo exist. Build the actual app here in `Sahayak-AI/` (the git repo root, where this file lives).
+**The project pivoted mid-hackathon to v2 (voice-first).** The active spec is `../context/new/`; the older `../context/` docs describe the abandoned v1 (pen-watching) concept — do not build from them.
+
+**v2:** voice-first form completion for people who can't read/write. A phone camera + a Gemini Live session let the user complete an official form by **speaking and showing their documents** (Aadhaar/PAN). The agent reads the form aloud in the user's language (Hindi/Tamil), captures each value by voice or by reading a document via camera, **confirms every value back by voice**, and the digital form fills itself live. A printable finished form is the finale.
+
+The code exists and works: deterministic parts are tested here; the mic/camera/Live path is venue-verified.
 
 ## Layout
 
-- `../context/` — the spec set (a sibling dir, NOT tracked in this repo). Read these before writing code; they ARE the source of truth.
-  - `PRD.md` — acceptance criteria (AC-1…AC-6). **The demo IS the spec.**
-  - `ARCHITECTURE.md` — topology, session config design, witness-log design, fallback tiers.
-  - `FORM_PACK_SPEC.md` — the mock form's field map. This exact map goes into `session_config.py`.
-  - `IMPLEMENTATION_PLAN.md` — hour-by-hour build order + kill-switches.
-  - `DEMO_SCRIPT.md`, `PITCH_DECK_OUTLINE.md` — stage choreography.
-- `Sahayak-AI/` (this repo) — all code lives here.
+- `../context/new/` — the **active** v2 spec (sibling dir, not tracked): `README.md`, `IMPLEMENTATION_PLAN.md` (5-hour, floor-first), `DEMO_SCRIPT.md`, `TEMPLATE_AND_PROMPT.md` (the field-map + system instruction).
+- `../context/` — superseded v1 docs. Ignore unless doing historical archaeology.
+- `Sahayak-AI/` (this repo) — all code. See `README.md` here for the file map and run/test commands.
 
-## Planned commands (from ../context/README.md — no code exists yet)
+## Commands
 
 ```bash
-export GOOGLE_API_KEY=...
-pip install -r requirements.txt
+python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+export GOOGLE_API_KEY=...                 # required for the Live session
 cd frontend && npm install && npm run build && cd ..
-uvicorn app.main:app --port 8000   # serves UI + WS at http://localhost:8000
+uvicorn app.main:app --port 8000          # serves UI + WS at http://localhost:8000
+
+pytest                                    # backend deterministic tests
+cd frontend && npm test                   # frontend tests
+python scripts/smoke_live.py              # headless Live connect + one text turn
 ```
 
-Runtime rig: phone-as-webcam (DroidCam/USB, USB preferred over wifi) feeds a virtual cam; one laptop, one phone, one printed form. No database, no queue, no GPU.
+Reloading backend: `uvicorn app.main:app --reload --reload-dir app` — keeps the reloader off the `data/` capture-log tree so a log write never drops a live session. Runtime rig: phone-as-webcam (DroidCam over USB), one laptop.
 
 ## Architecture (the big picture)
 
-Three tiers: **browser (React) ↔ FastAPI proxy ↔ Gemini Live API**. The proxy exists so the API key stays server-side, every session event flows through one place, reconnect/resume lives in Python, and the `/verify` pass can make a separate model call without touching the client.
+Three tiers: **browser (React) ↔ FastAPI proxy ↔ Gemini Live API**. The proxy keeps the API key server-side, funnels every session event through one place, and owns the deterministic record.
 
-Guiding principle: **perception is probabilistic; the record is deterministic.** The Live session sees/hears/judges/interrupts. The proxy logs every event to an append-only, hash-chained witness log and owns the `/verify` sweep. Nothing about the user's paperwork rides on model vibes alone.
+Guiding principle: **perception is probabilistic; the record is deterministic.** The Live session sees/hears/speaks; the proxy owns an append-only, hash-chained **capture log** — one `field_captured` entry per confirmed value, with its source (document|voice).
 
-Data flow:
-- Browser → proxy (WS): mic audio (PCM), video frames (JPEG, ~1 fps, ~768px during filling).
-- Proxy → Live API: forwards audio both ways, samples/forwards frames.
-- Proxy → browser (WS): agent audio, live English captions (both sides), events, verify results.
-- `POST /verify`: proxy sends 2–3 full-res frames + a structured field-by-field checklist request; parses leniently; renders ✓/✕/blank; appends verdicts to the witness log.
+Key files (details in `README.md`):
+- **`app/session_config.py`** is the most important file: the hardcoded `TEMPLATE` (`jkp_pension_2a`, 3 fields), the voice-first `SYSTEM_INSTRUCTION`, the `record_field`/`form_complete` tool declarations, `LIVE_MODEL` (env `SAHAYAK_LIVE_MODEL`), and `live_config()` (response modality AUDIO + input/output audio transcription + tools).
+- **`app/live_session.py`** `LiveRelay` — wraps the google-genai Live session; injectable for zero-network mock tests.
+- **`app/form_state.py`**, **`app/markers.py`**, **`app/witness_log.py`** — the deterministic core.
 
-**`session_config.py` is the most important file in the repo.** It carries: the Live model + response modality AUDIO + input/output transcription ENABLED (transcription = captions AND witness log, one stream two uses); VAD/barge-in config (tune at venue); the frame policy; and the system instruction that engineers the proactive interruption (AC-2) — including the `FORM MAP` from `FORM_PACK_SPEC.md` and the explicit "INTERRUPT IMMEDIATELY, unprompted, when writing contradicts a field's expected content" directive.
-
-Witness log: append-only JSONL on disk, each entry hash-chaining the previous. The model prefixes machine-parseable markers (e.g. `[[CATCH:father_name]]`) in its transcript; the proxy parses them into log entries and strips them from captions. Server owns it, so it is refresh-safe.
+Data flow: browser sends mic PCM16 16 kHz (binary, tag `0x01`) and camera JPEG ~1 fps (binary, tag `0x02`); proxy relays to the Live session; agent audio + captions + live form snapshots flow back. Capture happens via **Live tool-calling** (`record_field`) — the marker parser is a fallback only.
 
 ## Non-obvious constraints & rules
 
-- **AC-driven build.** No feature starts while an acceptance criterion is red. Every hour, ask which AC a task turns green.
-- **The interruption beat (AC-2) is never cut. It IS the project.** Everything else exists to frame it. If spontaneous interruption isn't ≥8/10 reliable via prompt engineering, fall back to the **Tier-2 watchdog** (proxy sends a silent text turn "inspect the latest frame against the form map; correct now if wrong" every ~5s) — externally identical, disclosed honestly if asked. Tier-3 fallback: push-to-talk half-duplex + on-demand frame checks.
-- **The honest latency claim is "within a second or two," not mid-stroke** — frame sampling is ~1 fps. Do not overclaim in code comments, UI copy, or docs.
-- **The form is a mock prop** (fictional "Jan Kalyan Pension Yojana", JKP-2A). Disclose freely. The agent knows the demo form's fields via the system-prompt field map — this is not universal OCR form parsing, and that boundary is in scope by design.
-- **Positioning discipline:** Sahayak is a task companion for live paperwork, NOT an education chatbot/tutor. It witnesses and intervenes in real work; it never teaches curriculum.
-- **Captions always English** regardless of spoken language, so judges follow. Language switch (Hindi↔Tamil) is pure user behavior — no client toggle; the Live model follows the spoken language.
-- **Cut order if behind:** tone beat (AC-5) → Tamil switch (keep Hindi + captions) → field-tracker UI (keep witness log). Never cut the interruption.
-- Demo hygiene lives in code too: a `demo-reset` script (restart session, clear witness log, camera-focus check, one warm caption round-trip), captions ≥20px, hotspot fallback network.
+- **google-genai must be 2.x** (pinned `==2.11.0`). v1's `0.8.0` lacked transcription, `send_realtime_input`, and VAD config — the whole v2 mechanism depends on 2.x. Do not downgrade.
+- **The core loop (ask → see doc / hear voice → confirm → fill) is never cut.** It IS the project. If behind: cut the voice-sourced field + tone beat → demo pure document-to-form capture. Language switch + tone frame the loop; they are not the loop.
+- **Capture is structured (tool calls), not scraped from transcribed speech.** Parsing `[[FIELD:...]]` brackets out of TTS is fragile; `record_field` is the primary path.
+- **Confirm before advance.** Never mark a field confirmed without the user's spoken approval — that confirmation is the trust model. The model is instructed to read documents (never ask the user to spell) and never invent a value it can't see/hear.
+- **One hardcoded template.** No admin-upload UI — pitched as roadmap. Document reading (printed cards) is far more reliable than handwriting; that reliability is why v2 is lower-risk than v1.
+- **Captions read from ~1m** (≥20px). Language switch (Hindi↔Tamil) is pure user behavior — no toggle; the Live model follows the spoken language.
+- **Honest boundary:** the capture log is tamper-evident against edits and mid-file deletions, NOT clean tail-truncation. For a fully illiterate user a human submit/thumbprint step remains. Don't overclaim.
+- **Positioning discipline:** a task companion completing real paperwork, NOT an education chatbot.

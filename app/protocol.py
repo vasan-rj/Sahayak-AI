@@ -43,3 +43,31 @@ def decode(message: dict) -> Frame:
     if not isinstance(obj, dict):
         return Frame(kind="text", error="not_object")
     return Frame(kind="text", data=obj)
+
+
+# --- Outbound event envelopes (proxy -> browser) -----------------------------
+# One place that defines the wire shape the React client consumes.
+
+
+def caption_event(side: str, text: str, lang: str | None = None, final: bool = True) -> dict:
+    """A live caption line. side is "user" or "agent"."""
+    return {"type": "caption", "side": side, "text": text, "lang": lang, "final": final}
+
+
+def field_update_event(field: dict) -> dict:
+    """One field just got confirmed; carries the field snapshot."""
+    return {"type": "field_update", "field": field}
+
+
+def form_snapshot_event(snapshot: dict) -> dict:
+    """The full current form state (drives the live-filling UI)."""
+    return {"type": "form_snapshot", "form": snapshot}
+
+
+def form_complete_event() -> dict:
+    return {"type": "form_complete"}
+
+
+def audio_event(data_b64: str) -> dict:
+    """A chunk of agent audio (base64-encoded PCM) for the browser to play."""
+    return {"type": "audio", "data": data_b64}

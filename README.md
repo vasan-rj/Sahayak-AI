@@ -1,71 +1,99 @@
 # Sahayak-AI
 
-Real-time multimodal form-filling companion. A phone camera watches a paper form;
-a Gemini Live API session guides the user in Hindi/Tamil, interrupts wrong fields
-unprompted, and closes with a verify pass. Built for the Google DeepMind Live API
-hackathon.
+**Voice-first form completion for people the digital economy can't reach.** A person
+who can't read or write completes an official form by speaking and showing their
+documents to a camera — and watches it fill itself. Built for the Google DeepMind
+Bangalore Hackathon (PS1 — Live API / Live Translate).
 
-Design thesis: **the perception is probabilistic; the record is deterministic.**
-The Live session sees, hears, judges, and interrupts. The proxy owns an
-append-only, hash-chained witness log and a discrete `/verify` pass.
+The agent reads the form aloud in the user's language (Hindi/Tamil), captures each
+value by **voice** or by **reading the user's documents** (Aadhaar/PAN) through the
+camera, **confirms every value back** ("मैंने लिखा: राजेश कुमार — सही है?"), and the
+digital form populates live. Design thesis carried from v1: **the perception is
+probabilistic; the record is deterministic** — a hash-chained capture log records
+every confirmed value with its source (document|voice).
 
-> Status: **walking skeleton.** The browser ↔ proxy WebSocket pipe, the witness
-> log, and the `/verify` contract are in place and tested. The Gemini Live relay
-> drops into the `/ws` frame dispatch next — it is not wired yet.
+## The loop
 
-## Layout
+1. Agent greets, asks for the first field.
+2. For each template field: **document** field → agent asks for the card, reads it via
+   camera; **voice** field → agent asks, user speaks.
+3. Agent confirms the value back by voice; user approves → the field fills on screen.
+4. When all fields are confirmed, the completed form renders clean and printable.
+
+## Architecture
+
+```
+Browser (React)  --WS-->  FastAPI proxy  --google-genai-->  Gemini Live API
+  mic PCM16 16kHz (binary, tag 0x01)        session lifecycle       (audio + video,
+  camera JPEG ~1fps (binary, tag 0x02)      relay both ways          transcription,
+  <-- agent audio, EN captions,             marker/tool capture       tool-calling)
+      live form snapshots, form_complete     -> form + capture log
+```
+
+- **Capture is via Live tool-calling** (`record_field`, `form_complete` function
+  declarations) — structured and language-agnostic. A `[[FIELD:id=value]]` marker
+  parser (`app/markers.py`) is a fallback and also scrubs stray markers from captions.
+- **Capture log** = per-session append-only, hash-chained JSONL (`app/witness_log.py`);
+  each confirmed field is a `field_captured` entry `{field, value, source}`.
+- **One hardcoded template** (`jkp_pension_2a`, 3 fields). Admin-upload-any-form is
+  roadmap, not built.
 
 ```
 app/
-  main.py            FastAPI: /health, POST /verify (stub), WS /ws (echo skeleton)
-  protocol.py        wire seam: binary frame -> media, text frame -> JSON envelope
-  session.py         Session + registry; per-connection outbound queue (single writer)
-  session_config.py  FORM_MAP, system instruction, flag_field tool schema (stub)
-  witness_log.py     append-only JSONL, hash-chained, tamper-detecting
-tests/               pytest: witness-log integrity + WS behavior
-frontend/            Vite + React + TS: 4-panel shell, useWebSocket hook (vitest)
+  main.py            FastAPI: /health, /template, WS /ws relay
+  live_session.py    LiveRelay over the Gemini Live session (injectable for tests)
+  session_config.py  TEMPLATE, system instruction, record_field/form_complete tools, LIVE_MODEL
+  form_state.py      the live-filling form (per-field value/status/source)
+  markers.py         [[FIELD]]/[[FORM_COMPLETE]] fallback parser + caption scrub
+  witness_log.py     append-only, hash-chained capture log
+  session.py         Session + registry, single-writer outbound queue
+  protocol.py        binary media in / JSON events out
+frontend/src/
+  App.tsx            layout, event reducer, language badge, captions
+  useMedia.ts        mic/camera capture + agent-audio playback (venue-verified)
+  useWebSocket.ts    typed event stream + binary send
+  Form.tsx           the form that fills itself live + printable finale
+scripts/smoke_live.py  headless connect + one text turn (no audio)
 ```
 
 ## Run
 
-Backend:
-
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-export GOOGLE_API_KEY=...            # not needed until the Live wiring lands
-# --reload-dir app keeps the reloader off the witness-log tree (data/), so a log
-# append never restarts the server and drops a live session mid-demo.
-uvicorn app.main:app --port 8000 --reload --reload-dir app
+export GOOGLE_API_KEY=...                 # required for the Live session
+export SAHAYAK_LIVE_MODEL=...             # optional; override the Live model id
+cd frontend && npm install && npm run build && cd ..
+uvicorn app.main:app --port 8000          # open http://localhost:8000
 ```
 
-Frontend (dev, proxies /ws + /health + /verify to :8000):
+Dev (frontend proxies /ws, /health, /template to :8000):
 
 ```bash
-cd frontend && npm install && npm run dev
+cd frontend && npm run dev
 ```
 
-Production single-origin (proxy serves the built UI at `/`):
-
-```bash
-cd frontend && npm run build && cd ..
-uvicorn app.main:app --port 8000      # open http://localhost:8000
-```
+Reloading backend: `uvicorn app.main:app --reload --reload-dir app` keeps the
+reloader off the `data/` capture-log tree so a log write never drops a live session.
 
 ## Test
 
 ```bash
-. .venv/bin/activate && pytest        # backend: witness log + WS
-cd frontend && npm test               # frontend: WS hook
+. .venv/bin/activate && pytest          # markers, form_state, live_relay (mock), witness_log, ws (mock relay)
+cd frontend && npm test                 # Form, useWebSocket, reducer
+python scripts/smoke_live.py            # headless Live connect + one text turn (needs GOOGLE_API_KEY)
 ```
 
-## Witness log integrity — what it does and does not prove
+The mic/camera/audio path (`useMedia.ts`) needs real hardware and is verified at the
+venue, not in CI.
 
-Each entry hash-chains the previous one, so `verify_chain` detects any in-place
-edit, reordering, deletion, or insertion in the **middle** of the log.
+## Honest boundaries
 
-**Known limitation (by design):** hash-chaining alone cannot detect a *clean
-truncation of the tail* — dropping the last N whole lines leaves nothing
-downstream to contradict the forged new end. Catching that needs external
-anchoring, which is out of scope. The log is tamper-evident against edits and
-mid-file deletions, not against someone cleanly lopping off the end.
+- For a fully illiterate user there is still a human submit/thumbprint step — Sahayak
+  makes the **capture** accurate, in-language, and confirmed by the applicant, not the
+  submission itself.
+- Session content is ephemeral; the capture log stays local.
+- The capture log is tamper-evident against edits and mid-file deletions, **not**
+  against a clean truncation of the tail (that needs external anchoring — out of scope).
+- One baked-in template; generalization (OCR any uploaded form to build the field-map)
+  is near-term, not demoed.

@@ -34,7 +34,7 @@ def test_empty_log_verifies_and_reads_nothing(tmp_path):
 def test_append_then_read_roundtrip(tmp_path):
     log = _log(tmp_path)
     e0 = log.append("session_start", {"session_id": "abc"}, ts=FIXED_TS)
-    e1 = log.append("field_explained", {"field": "dob"}, ts=FIXED_TS)
+    e1 = log.append("field_captured", {"field": "dob"}, ts=FIXED_TS)
     assert e0["seq"] == 0 and e0["prev_hash"] == GENESIS_HASH
     assert e1["seq"] == 1 and e1["prev_hash"] == e0["hash"]
     assert log.read() == [e0, e1]
@@ -55,9 +55,9 @@ def test_unicode_hindi_tamil_hashes_stable(tmp_path):
     identically, and the chain must verify with non-ASCII in the data."""
     log = _log(tmp_path)
     data = {"field": "applicant_name", "value": "राजेश कुमार", "note": "தமிழ்"}
-    e = log.append("field_explained", data, ts=FIXED_TS)
+    e = log.append("field_captured", data, ts=FIXED_TS)
     # Same material recomputes to the same hash.
-    assert hash_entry(0, FIXED_TS, "field_explained", data, GENESIS_HASH) == e["hash"]
+    assert hash_entry(0, FIXED_TS, "field_captured", data, GENESIS_HASH) == e["hash"]
     assert log.verify() is True
     # And it survives a read round-trip (UTF-8 on disk).
     assert log.read()[0]["data"]["value"] == "राजेश कुमार"
@@ -68,7 +68,7 @@ def test_tamper_inplace_edit_of_value_char(tmp_path):
     entry — verify_chain must return False via hash mismatch."""
     log = _log(tmp_path)
     log.append("session_start", {"session_id": "abc"}, ts=FIXED_TS)
-    log.append("field_explained", {"field": "dob", "value": "AAAA"}, ts=FIXED_TS)
+    log.append("field_captured", {"field": "dob", "value": "AAAA"}, ts=FIXED_TS)
     log.append("session_end", {"session_id": "abc"}, ts=FIXED_TS)
 
     entries = log.read()
@@ -80,7 +80,7 @@ def test_tamper_reorder_entries(tmp_path):
     """Swapping two whole valid entries breaks seq/prev_hash linkage."""
     log = _log(tmp_path)
     log.append("session_start", ts=FIXED_TS)
-    log.append("field_explained", {"field": "dob"}, ts=FIXED_TS)
+    log.append("field_captured", {"field": "dob"}, ts=FIXED_TS)
     log.append("session_end", ts=FIXED_TS)
 
     entries = log.read()
@@ -92,7 +92,7 @@ def test_tamper_delete_middle_entry(tmp_path):
     """Deleting a middle entry breaks the prev_hash of the next."""
     log = _log(tmp_path)
     log.append("session_start", ts=FIXED_TS)
-    log.append("field_explained", {"field": "dob"}, ts=FIXED_TS)
+    log.append("field_captured", {"field": "dob"}, ts=FIXED_TS)
     log.append("session_end", ts=FIXED_TS)
 
     entries = log.read()
@@ -139,7 +139,7 @@ def test_clean_tail_truncation_is_the_known_gap(tmp_path):
     claim is not overstated."""
     log = _log(tmp_path)
     log.append("session_start", ts=FIXED_TS)
-    log.append("field_explained", {"field": "dob"}, ts=FIXED_TS)
+    log.append("field_captured", {"field": "dob"}, ts=FIXED_TS)
     log.append("session_end", ts=FIXED_TS)
 
     lines = (tmp_path / "s.jsonl").read_text().splitlines()

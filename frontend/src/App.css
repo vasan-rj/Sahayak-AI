@@ -28,38 +28,41 @@ body {
 
 .topbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1.25rem;
   border-bottom: 1px solid var(--line);
 }
-
 .topbar h1 {
   margin: 0;
   font-size: 1.4rem;
 }
-
 .deva {
   color: var(--muted);
   font-weight: 400;
 }
-
+.badges {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.lang {
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+}
 .status {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
   border: 1px solid var(--line);
+  color: var(--muted);
 }
 .status-open {
   color: var(--ok);
   border-color: var(--ok);
-}
-.status-connecting {
-  color: var(--muted);
-}
-.status-closed {
-  color: #e0555a;
-  border-color: #e0555a;
 }
 
 .grid {
@@ -78,58 +81,147 @@ body {
   overflow: auto;
 }
 
-.panel h2 {
-  margin: 0 0 0.5rem;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+.camera {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cam {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  background: #000;
+}
+.startbtn {
+  position: absolute;
+  padding: 0.8rem 1.4rem;
+  font-size: 1.1rem;
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.err {
+  position: absolute;
+  bottom: 0.5rem;
+  color: #e0555a;
 }
 
 .record {
-  grid-row: 1 / 3;
   grid-column: 2;
+  grid-row: 1 / 3;
 }
 
 /* Captions must read from ~1m away. */
 .captions {
   grid-column: 1;
+  grid-row: 2;
 }
-.captions .ph {
-  font-size: 20px;
+.cap {
+  margin: 0.25rem 0;
+  font-size: 22px;
+  line-height: 1.35;
 }
-
-.ph {
+.cap-agent {
+  color: var(--ink);
+}
+.cap-user {
   color: var(--muted);
+  font-size: 18px;
 }
 
-.btns {
-  display: flex;
+.form-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+.fields {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.field {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.2s;
 }
-
-button {
+.flabel {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.fvalue {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.field-pending .fvalue {
+  color: var(--muted);
+  font-weight: 400;
+}
+.field-confirmed {
+  background: rgba(56, 193, 114, 0.08);
+}
+.fsource {
+  font-size: 1.1rem;
+}
+.done {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--ok);
+  font-weight: 600;
+}
+.done button {
   background: var(--accent);
   color: white;
   border: 0;
   border-radius: 6px;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.95rem;
+  padding: 0.45rem 0.9rem;
   cursor: pointer;
 }
-button:disabled {
-  background: var(--line);
+.ph {
   color: var(--muted);
-  cursor: not-allowed;
+}
+.banner-error {
+  padding: 0.6rem 1.25rem;
+  background: #3a1d1f;
+  color: #ffb4b7;
 }
 
-.last {
-  background: #0b0e13;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.6rem;
-  color: var(--muted);
-  font-size: 0.85rem;
-  overflow-x: auto;
+/* Print: only the completed form. */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  .topbar,
+  .camera,
+  .captions,
+  .banner-error,
+  .done button {
+    display: none !important;
+  }
+  .grid {
+    display: block;
+    background: white;
+  }
+  .record {
+    background: white;
+  }
+  .field-confirmed {
+    background: white;
+  }
+  .flabel,
+  .fvalue,
+  .form-title {
+    color: black;
+  }
 }

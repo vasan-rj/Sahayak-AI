@@ -24,6 +24,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from .form_state import FormState
 from .witness_log import WitnessLog
 
 OUTBOUND_MAXSIZE = 100
@@ -40,7 +41,9 @@ class Session:
     id: str
     log: WitnessLog
     outbound: "asyncio.Queue[dict]"
+    form: FormState
     ws: Any = None  # live WebSocket, attached by the /ws handler after accept
+    relay: Any = None  # LiveRelay to the Gemini Live session, attached by /ws
     resume_handle: str | None = None  # reserved: Gemini session-resumption token
     state: str = "open"
 
@@ -54,7 +57,12 @@ class SessionRegistry:
     def create(self) -> Session:
         sid = uuid.uuid4().hex
         log = WitnessLog(os.path.join(self.log_dir, f"{sid}.jsonl"))
-        session = Session(id=sid, log=log, outbound=asyncio.Queue(maxsize=OUTBOUND_MAXSIZE))
+        session = Session(
+            id=sid,
+            log=log,
+            outbound=asyncio.Queue(maxsize=OUTBOUND_MAXSIZE),
+            form=FormState(),
+        )
         self._sessions[sid] = session
         return session
 

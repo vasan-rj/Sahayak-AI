@@ -1,7 +1,7 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 websockets==14.1
-google-genai==0.8.0
+google-genai==2.11.0
 python-multipart==0.0.20
 
 # dev / test
